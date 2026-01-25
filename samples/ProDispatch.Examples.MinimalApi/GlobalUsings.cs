@@ -1,0 +1,15 @@
+global using Scalar.AspNetCore;
+global using ProDispatch.Abstractions.Commands;
+global using ProDispatch.Abstractions.Dispatcher;
+global using ProDispatch.Abstractions.Exceptions;
+global using ProDispatch.Abstractions.Notifications;
+global using ProDispatch.Abstractions.Pipeline;
+global using ProDispatch.Abstractions.Queries;
+global using ProDispatch.Abstractions.Validation;
+global using ProDispatch.Behaviors;
+global using ProDispatch.Dispatcher;
+global using ProDispatch.Examples.MinimalApi.Behaviors;
+global using ProDispatch.Examples.MinimalApi.Features.Users.Commands;
+global using ProDispatch.Examples.MinimalApi.Features.Users.Notifications;
+global using ProDispatch.Examples.MinimalApi.Features.Users.Queries;
+global using ProDispatch.ServiceFactory;

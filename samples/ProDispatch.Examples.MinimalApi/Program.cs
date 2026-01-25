@@ -1,0 +1,101 @@
+var builder = WebApplication.CreateBuilder(args);
+
+// Add OpenAPI/Swagger
+builder.Services.AddOpenApi();
+
+// Setup service factory
+var serviceFactory = new SimpleServiceFactory();
+InProcessDispatcher? dispatcher = null;
+
+// Register handlers
+serviceFactory.Register<ICommandHandler<CreateUser>>(() => new CreateUserHandler(dispatcher!));
+serviceFactory.Register<IQueryHandler<GetUserById, UserDto>>(() => new GetUserByIdHandler());
+serviceFactory.Register<INotificationHandler<UserCreated>>(() => new UserCreatedNotificationHandler());
+serviceFactory.Register<INotificationHandler<UserCreated>>(() => new SendWelcomeEmailNotificationHandler());
+
+// Register pipeline behaviors (outermost first)
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUser, object>),
+    () => new LoggingBehavior<CreateUser, object>());
+
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUser, object>),
+    () => new ValidationBehavior<CreateUser, object>());
+
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUser, object>),
+    () => new TimingBehavior<CreateUser, object>());
+
+serviceFactory.Register(
+    typeof(IPipelineBehavior<GetUserById, UserDto>),
+    () => new LoggingBehavior<GetUserById, UserDto>());
+
+serviceFactory.Register(
+    typeof(IPipelineBehavior<GetUserById, UserDto>),
+    () => new TimingBehavior<GetUserById, UserDto>());
+
+// Create dispatcher instance
+dispatcher = new InProcessDispatcher(serviceFactory);
+
+var app = builder.Build();
+
+app.MapOpenApi();
+app.MapScalarApiReference();
+
+// Health check endpoint
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }))
+    .WithName("Health")
+    .WithDescription("Check API health status");
+
+// Create user endpoint
+app.MapPost("/users", async (CreateUserRequest request) =>
+{
+    try
+    {
+        var command = new CreateUser(request.UserName, request.Email);
+        await dispatcher!.SendAsync(command);
+        return Results.Created($"/users", request);
+    }
+    catch (ValidationException ex)
+    {
+        return Results.BadRequest(new { errors = ex.Errors });
+    }
+    catch
+    {
+        return Results.StatusCode(500);
+    }
+})
+    .WithName("CreateUser")
+    .WithDescription("Create a new user with validation");
+
+// Get user endpoint
+app.MapGet("/users/{userId:guid}", async (Guid userId) =>
+{
+    try
+    {
+        var query = new GetUserById(userId);
+        var user = await dispatcher!.SendAsync(query);
+        return Results.Ok(user);
+    }
+    catch (InvalidOperationException)
+    {
+        return Results.NotFound(new { message = "User not found" });
+    }
+    catch
+    {
+        return Results.StatusCode(500);
+    }
+})
+    .WithName("GetUser")
+    .WithDescription("Retrieve user details by ID");
+
+app.Run();
+
+// Request DTOs
+public record CreateUserRequest(string UserName, string Email);
+
+// Feature namespace for users
+namespace ProDispatch.Examples.MinimalApi.Features.Users
+{
+    // Commands and handlers would go here (see next files)
+}

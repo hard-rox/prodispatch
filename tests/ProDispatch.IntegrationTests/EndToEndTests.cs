@@ -1,4 +1,3 @@
-using FluentAssertions;
 using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Dispatcher;
 using ProDispatch.Abstractions.Notifications;
@@ -35,9 +34,10 @@ public class EndToEndTests
 
         var user = await dispatcher.SendAsync(new GetUserById(store.LastUserId));
 
-        user.UserName.Should().Be("alice");
-        events.Should().Contain("notification:alice");
-        events.Should().ContainInOrder("behavior:create:enter", "behavior:create:exit");
+        Assert.Equal("alice", user.UserName);
+        Assert.Contains("notification:alice", events);
+        Assert.Contains("behavior:create:enter", events);
+        Assert.Contains("behavior:create:exit", events);
     }
 
     private sealed record CreateUser(string UserName, string Email) : ICommand, ProDispatch.Abstractions.Validation.IValidatable
