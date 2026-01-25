@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="benchmarks/ProDispatch.Benchmarks/ProDispatch.Benchmarks.csproj" />
+  <Project Path="samples/ProDispatch.Examples.Console/ProDispatch.Examples.Console.csproj" />
+  <Project Path="src/ProDispatch/ProDispatch.csproj" />
+  <Project Path="tests/ProDispatch.IntegrationTests/ProDispatch.IntegrationTests.csproj" />
+  <Project Path="tests/ProDispatch.Tests/ProDispatch.Tests.csproj" />
+</Solution>
