@@ -1,0 +1,9 @@
+global using ProDispatch.Abstractions.Commands;
+global using ProDispatch.Abstractions.Dispatcher;
+global using ProDispatch.Abstractions.Notifications;
+global using ProDispatch.Abstractions.Pipeline;
+global using ProDispatch.Abstractions.Queries;
+global using ProDispatch.Abstractions.Validation;
+global using ProDispatch.Behaviors;
+global using ProDispatch.Dispatcher;
+global using ProDispatch.ServiceFactory;

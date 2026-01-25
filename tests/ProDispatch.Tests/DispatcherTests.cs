@@ -1,4 +1,3 @@
-using FluentAssertions;
 using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Exceptions;
 using ProDispatch.Abstractions.Notifications;
@@ -22,7 +21,7 @@ public class DispatcherTests
 
         await dispatcher.SendAsync(new TestCommand("ping"));
 
-        log.Should().ContainSingle("handled:ping");
+        Assert.Single(log, "handled:ping");
     }
 
     [Fact]
@@ -37,7 +36,7 @@ public class DispatcherTests
 
         await dispatcher.SendAsync(new TestCommand("order"));
 
-        log.Should().ContainInOrder("behavior:outer:enter", "behavior:inner:enter", "handled:order", "behavior:inner:exit", "behavior:outer:exit");
+        Assert.Equal(new[] { "behavior:outer:enter", "behavior:inner:enter", "handled:order", "behavior:inner:exit", "behavior:outer:exit" }, log);
     }
 
     [Fact]
@@ -49,7 +48,7 @@ public class DispatcherTests
 
         var result = await dispatcher.SendAsync(new ResultCommand(41));
 
-        result.Should().Be(42);
+        Assert.Equal(42, result);
     }
 
     [Fact]
@@ -63,7 +62,7 @@ public class DispatcherTests
 
         await dispatcher.PublishAsync(new TestNotification("event"));
 
-        log.Should().BeEquivalentTo(new[] { "first:event", "second:event" });
+        Assert.Equal(new[] { "first:event", "second:event" }, log);
     }
 
     [Fact]
@@ -74,9 +73,9 @@ public class DispatcherTests
         factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
         var dispatcher = new InProcessDispatcher(factory);
 
-        var act = async () => await dispatcher.SendAsync(new ValidatedCommand(string.Empty));
+        var act = () => dispatcher.SendAsync(new ValidatedCommand(string.Empty));
 
-        await act.Should().ThrowAsync<ValidationException>();
+        await Assert.ThrowsAsync<ValidationException>(act);
     }
 
     [Fact]
