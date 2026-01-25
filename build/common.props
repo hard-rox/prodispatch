@@ -1,9 +1,0 @@
-<Project>
-  <PropertyGroup>
-    <Company>ProDispatch</Company>
-    <Authors>ProDispatch</Authors>
-    <RepositoryUrl>https://github.com/example/ProDispatch</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/example/ProDispatch</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-  </PropertyGroup>
-</Project>
