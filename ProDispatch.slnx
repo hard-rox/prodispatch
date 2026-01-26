@@ -10,7 +10,7 @@
     <Project Path="src/ProDispatch/ProDispatch.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/ProDispatch.IntegrationTests/ProDispatch.IntegrationTests.csproj" />
     <Project Path="tests/ProDispatch.Tests/ProDispatch.Tests.csproj" />
+    <Project Path="tests\ProDispatch.IntegrationTests\ProDispatch.IntegrationTests.csproj" />
   </Folder>
 </Solution>

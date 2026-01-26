@@ -18,7 +18,7 @@ public class DispatcherTests
         factory.Register<ICommandHandler<TestCommand>>(() => new TestCommandHandler(log));
         InProcessDispatcher dispatcher = new(factory);
 
-        await dispatcher.SendAsync(new TestCommand("ping"));
+        await dispatcher.SendAsync(new TestCommand("ping"), CancellationToken.None);
 
         Assert.Single(log, "handled:ping");
     }
@@ -33,7 +33,7 @@ public class DispatcherTests
         factory.Register(typeof(IPipelineBehavior<TestCommand, object>), () => new RecordingBehavior<TestCommand>(log, "inner"));
         InProcessDispatcher dispatcher = new(factory);
 
-        await dispatcher.SendAsync(new TestCommand("order"));
+        await dispatcher.SendAsync(new TestCommand("order"), CancellationToken.None);
 
         Assert.Equal(new[] { "behavior:outer:enter", "behavior:inner:enter", "handled:order", "behavior:inner:exit", "behavior:outer:exit" }, log);
     }
@@ -45,7 +45,7 @@ public class DispatcherTests
         factory.Register<ICommandHandler<ResultCommand, int>>(() => new ResultCommandHandler());
         InProcessDispatcher dispatcher = new(factory);
 
-        var result = await dispatcher.SendAsync(new ResultCommand(41));
+        var result = await dispatcher.SendAsync(new ResultCommand(41), CancellationToken.None);
 
         Assert.Equal(42, result);
     }
@@ -59,7 +59,7 @@ public class DispatcherTests
         factory.Register<INotificationHandler<TestNotification>>(() => new RecordingNotificationHandler(log, "second"));
         InProcessDispatcher dispatcher = new(factory);
 
-        await dispatcher.PublishAsync(new TestNotification("event"));
+        await dispatcher.PublishAsync(new TestNotification("event"), CancellationToken.None);
 
         Assert.Equal(new[] { "first:event", "second:event" }, log);
     }
@@ -85,7 +85,7 @@ public class DispatcherTests
         factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
         InProcessDispatcher dispatcher = new(factory);
 
-        await dispatcher.SendAsync(new ValidatedCommand("ok"));
+        await dispatcher.SendAsync(new ValidatedCommand("ok"), CancellationToken.None);
     }
 
     private sealed record TestCommand(string Payload) : ICommand;

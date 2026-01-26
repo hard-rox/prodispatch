@@ -23,16 +23,16 @@ public class EndToEndTests
         factory.Register<IQueryHandler<GetUserById, UserDto>>(() => new GetUserByIdHandler(store));
         factory.Register<INotificationHandler<UserCreated>>(() => new UserCreatedHandler(events));
 
-        factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new LoggingBehavior<CreateUser, object>());
-        factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new ValidationBehavior<CreateUser, object>());
-        factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new TrackingBehavior<CreateUser>(events, "create"));
+        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new LoggingBehavior<CreateUser, object>());
+        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new ValidationBehavior<CreateUser, object>());
+        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new TrackingBehavior<CreateUser>(events, "create"));
 
-        dispatcher = new(factory);
+        dispatcher = new InProcessDispatcher(factory);
 
         CreateUser command = new("alice", "alice@example.com");
-        await dispatcher.SendAsync(command);
+        await dispatcher.SendAsync(command, TestContext.Current.CancellationToken);
 
-        UserDto user = await dispatcher.SendAsync(new GetUserById(store.LastUserId));
+        UserDto user = await dispatcher.SendAsync(new GetUserById(store.LastUserId), TestContext.Current.CancellationToken);
 
         Assert.Equal("alice", user.UserName);
         Assert.Contains("notification:alice", events);
@@ -55,7 +55,7 @@ public class EndToEndTests
         public async Task HandleAsync(CreateUser command, CancellationToken cancellationToken = default)
         {
             Guid id = Guid.NewGuid();
-            store.Add(new(id, command.UserName, command.Email));
+            store.Add(new UserDto(id, command.UserName, command.Email));
             await dispatcherAccessor().PublishAsync(new UserCreated(id, command.UserName), cancellationToken);
         }
     }
