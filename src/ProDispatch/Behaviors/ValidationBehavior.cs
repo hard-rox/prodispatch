@@ -1,7 +1,3 @@
-using ProDispatch.Abstractions.Exceptions;
-using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Abstractions.Validation;
-
 namespace ProDispatch.Behaviors;
 
 /// <summary>
@@ -21,7 +17,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
     {
         if (request is IValidatable validatable)
         {
-            var errors = validatable.Validate().ToList();
+            List<string> errors = validatable.Validate().ToList();
             if (errors.Count > 0)
             {
                 Console.WriteLine($"[VALIDATION] Validation failed for {request.GetType().Name}");

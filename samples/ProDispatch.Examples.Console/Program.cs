@@ -1,17 +1,10 @@
-using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Exceptions;
-using ProDispatch.Abstractions.Notifications;
-using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Abstractions.Queries;
-using ProDispatch.Behaviors;
-using ProDispatch.Dispatcher;
 using ProDispatch.Examples.Console.Features.Users.Commands;
 using ProDispatch.Examples.Console.Features.Users.Notifications;
 using ProDispatch.Examples.Console.Features.Users.Queries;
-using ProDispatch.ServiceFactory;
 
 // Setup service factory
-var serviceFactory = new SimpleServiceFactory();
+SimpleServiceFactory serviceFactory = new();
 
 // Create dispatcher first (it will be used for dependency injection)
 InProcessDispatcher? dispatcher = null;
@@ -45,7 +38,7 @@ serviceFactory.Register(
     () => new LoggingBehavior<GetUserByIdQuery, UserDto>());
 
 // Create dispatcher instance
-dispatcher = new InProcessDispatcher(serviceFactory);
+dispatcher = new(serviceFactory);
 
 Console.WriteLine("=== ProDispatch Demo ===");
 
@@ -53,7 +46,7 @@ Console.WriteLine("=== ProDispatch Demo ===");
 try
 {
     Console.WriteLine("--- Demo 1: Creating a User (Command) ---");
-    var createCommand = new CreateUserCommand("john_doe", "john@example.com");
+    CreateUserCommand createCommand = new("john_doe", "john@example.com");
     await dispatcher.SendAsync(createCommand);
     Console.WriteLine();
 }
@@ -66,8 +59,8 @@ catch (ValidationException ex)
 try
 {
     Console.WriteLine("--- Demo 2: Fetching a User (Query) ---");
-    var getQuery = new GetUserByIdQuery(new Guid("00000000-0000-0000-0000-000000000001"));
-    var user = await dispatcher.SendAsync(getQuery);
+    GetUserByIdQuery getQuery = new(new("00000000-0000-0000-0000-000000000001"));
+    UserDto user = await dispatcher.SendAsync(getQuery);
     Console.WriteLine($"Result: {user}\n");
 }
 catch (Exception ex)
@@ -79,8 +72,8 @@ catch (Exception ex)
 try
 {
     Console.WriteLine("--- Demo 3: Updating User Email (Command with Result) ---");
-    var updateCommand = new UpdateUserEmailCommand(
-        new Guid("00000000-0000-0000-0000-000000000001"),
+    UpdateUserEmailCommand updateCommand = new(
+        new("00000000-0000-0000-0000-000000000001"),
         "newemail@example.com");
     var result = await dispatcher.SendAsync(updateCommand);
     Console.WriteLine($"Update result: {result}\n");
@@ -94,7 +87,7 @@ catch (Exception ex)
 try
 {
     Console.WriteLine("--- Demo 4: Validation Failure ---");
-    var invalidCommand = new CreateUserCommand("jane_doe", "invalid-email");
+    CreateUserCommand invalidCommand = new("jane_doe", "invalid-email");
     await dispatcher.SendAsync(invalidCommand);
 }
 catch (ValidationException ex)

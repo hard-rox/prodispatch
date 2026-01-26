@@ -1,6 +1,3 @@
-using ProDispatch.Abstractions.Commands;
-using ProDispatch.Abstractions.Validation;
-
 namespace ProDispatch.Examples.Console.Features.Users.Commands;
 
 public class UpdateUserEmailCommand : ICommand<bool>, IValidatable
@@ -16,7 +13,7 @@ public class UpdateUserEmailCommand : ICommand<bool>, IValidatable
 
     public IEnumerable<string> Validate()
     {
-        var errors = new List<string>();
+        List<string> errors = new();
 
         if (UserId == Guid.Empty)
             errors.Add("UserId cannot be empty");

@@ -1,5 +1,3 @@
-using ProDispatch.Abstractions.Commands;
-
 namespace ProDispatch.Examples.Console.Features.Users.Commands;
 
 public class UpdateUserEmailCommandHandler : ICommandHandler<UpdateUserEmailCommand, bool>

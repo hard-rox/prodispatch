@@ -5,12 +5,12 @@ public class GetUserByIdHandler : IQueryHandler<GetUserById, UserDto>
     // In-memory user store for demo
     private static readonly Dictionary<Guid, UserDto> Users = new()
     {
-        [new Guid("00000000-0000-0000-0000-000000000001")] = new(
-            new Guid("00000000-0000-0000-0000-000000000001"),
+        [new("00000000-0000-0000-0000-000000000001")] = new(
+            new("00000000-0000-0000-0000-000000000001"),
             "alice",
             "alice@example.com"),
-        [new Guid("00000000-0000-0000-0000-000000000002")] = new(
-            new Guid("00000000-0000-0000-0000-000000000002"),
+        [new("00000000-0000-0000-0000-000000000002")] = new(
+            new("00000000-0000-0000-0000-000000000002"),
             "bob",
             "bob@example.com"),
     };
@@ -19,7 +19,7 @@ public class GetUserByIdHandler : IQueryHandler<GetUserById, UserDto>
     {
         Console.WriteLine($"[QUERY] Fetching user with ID: {query.Id}");
 
-        if (Users.TryGetValue(query.Id, out var user))
+        if (Users.TryGetValue(query.Id, out UserDto? user))
         {
             return Task.FromResult(user);
         }

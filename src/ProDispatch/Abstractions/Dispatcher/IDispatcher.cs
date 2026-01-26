@@ -1,7 +1,3 @@
-using ProDispatch.Abstractions.Commands;
-using ProDispatch.Abstractions.Notifications;
-using ProDispatch.Abstractions.Queries;
-
 namespace ProDispatch.Abstractions.Dispatcher;
 
 /// <summary>

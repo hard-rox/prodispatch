@@ -23,8 +23,8 @@ public class DispatcherBenchmarks
         _commandOnePipelineDispatcher = BuildCommandDispatcherOnePipeline();
         _commandMultiplePipelineDispatcher = BuildCommandDispatcherMultiplePipeline();
         _notificationDispatcher = BuildNotificationDispatcher();
-        _command = new BenchmarkCommand();
-        _notification = new BenchmarkNotification("bench");
+        _command = new();
+        _notification = new("bench");
     }
 
     [Benchmark]
@@ -41,35 +41,35 @@ public class DispatcherBenchmarks
 
     private static InProcessDispatcher BuildCommandDispatcherNoPipeline()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
-        return new InProcessDispatcher(factory);
+        return new(factory);
     }
 
     private static InProcessDispatcher BuildCommandDispatcherOnePipeline()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
         factory.Register(typeof(IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
-        return new InProcessDispatcher(factory);
+        return new(factory);
     }
 
     private static InProcessDispatcher BuildCommandDispatcherMultiplePipeline()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
         factory.Register(typeof(IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
         factory.Register(typeof(IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
-        return new InProcessDispatcher(factory);
+        return new(factory);
     }
 
     private static InProcessDispatcher BuildNotificationDispatcher()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
         factory.Register<INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
         factory.Register<INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
-        return new InProcessDispatcher(factory);
+        return new(factory);
     }
 
     private sealed record BenchmarkCommand : ICommand;

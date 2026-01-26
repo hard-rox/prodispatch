@@ -1,10 +1,10 @@
-var builder = WebApplication.CreateBuilder(args);
+WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add OpenAPI/Swagger
 builder.Services.AddOpenApi();
 
 // Setup service factory
-var serviceFactory = new SimpleServiceFactory();
+SimpleServiceFactory serviceFactory = new();
 InProcessDispatcher? dispatcher = null;
 
 // Register handlers
@@ -35,9 +35,9 @@ serviceFactory.Register(
     () => new TimingBehavior<GetUserById, UserDto>());
 
 // Create dispatcher instance
-dispatcher = new InProcessDispatcher(serviceFactory);
+dispatcher = new(serviceFactory);
 
-var app = builder.Build();
+WebApplication app = builder.Build();
 
 app.MapOpenApi();
 app.MapScalarApiReference();
@@ -52,7 +52,7 @@ app.MapPost("/users", async (CreateUserRequest request) =>
 {
     try
     {
-        var command = new CreateUser(request.UserName, request.Email);
+        CreateUser command = new(request.UserName, request.Email);
         await dispatcher!.SendAsync(command);
         return Results.Created($"/users", request);
     }
@@ -73,8 +73,8 @@ app.MapGet("/users/{userId:guid}", async (Guid userId) =>
 {
     try
     {
-        var query = new GetUserById(userId);
-        var user = await dispatcher!.SendAsync(query);
+        GetUserById query = new(userId);
+        UserDto user = await dispatcher!.SendAsync(query);
         return Results.Ok(user);
     }
     catch (InvalidOperationException)

@@ -1,5 +1,3 @@
-using ProDispatch.Abstractions.Pipeline;
-
 namespace ProDispatch.Behaviors;
 
 /// <summary>
@@ -18,20 +16,20 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         Func<TRequest, CancellationToken, Task<TResponse>> next)
     {
         var requestType = request?.GetType().Name ?? "Unknown";
-        var startTime = DateTime.UtcNow;
+        DateTime startTime = DateTime.UtcNow;
 
         Console.WriteLine($"[LOG] Starting request: {requestType}");
 
         try
         {
-            var response = await next(request!, cancellationToken);
-            var duration = DateTime.UtcNow - startTime;
+            TResponse response = await next(request!, cancellationToken);
+            TimeSpan duration = DateTime.UtcNow - startTime;
             Console.WriteLine($"[LOG] Completed request: {requestType} (Duration: {duration.TotalMilliseconds}ms)");
             return response;
         }
         catch (Exception ex)
         {
-            var duration = DateTime.UtcNow - startTime;
+            TimeSpan duration = DateTime.UtcNow - startTime;
             Console.WriteLine($"[LOG] Failed request: {requestType} (Duration: {duration.TotalMilliseconds}ms, Error: {ex.Message})");
             throw;
         }

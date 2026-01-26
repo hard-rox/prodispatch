@@ -1,5 +1,3 @@
-using ProDispatch.Abstractions.Queries;
-
 namespace ProDispatch.Examples.Console.Features.Users.Queries;
 
 public class GetUserByIdQuery : IQuery<UserDto>

@@ -16,10 +16,10 @@ public class TimingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, T
         CancellationToken cancellationToken,
         Func<TRequest, CancellationToken, Task<TResponse>> next)
     {
-        var stopwatch = Stopwatch.StartNew();
+        Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {
-            var result = await next(request, cancellationToken);
+            TResponse result = await next(request, cancellationToken);
             stopwatch.Stop();
             Console.WriteLine($"[TIMING] {typeof(TRequest).Name} completed in {stopwatch.ElapsedMilliseconds}ms");
             return result;

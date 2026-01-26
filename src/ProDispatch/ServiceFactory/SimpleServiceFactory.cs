@@ -13,7 +13,7 @@ public class SimpleServiceFactory : IServiceFactory
     /// <param name="factory">Factory delegate.</param>
     public void Register<T>(Func<object> factory) where T : class
     {
-        var type = typeof(T);
+        Type type = typeof(T);
         if (!_serviceFactories.ContainsKey(type))
         {
             _serviceFactories[type] = [];
@@ -41,7 +41,7 @@ public class SimpleServiceFactory : IServiceFactory
     /// <exception cref="InvalidOperationException">Thrown when the type is not registered.</exception>
     public object GetInstance(Type serviceType)
     {
-        if (_serviceFactories.TryGetValue(serviceType, out var factories) && factories.Count > 0)
+        if (_serviceFactories.TryGetValue(serviceType, out List<Func<object>>? factories) && factories.Count > 0)
         {
             return factories[0]();
         }
@@ -54,7 +54,7 @@ public class SimpleServiceFactory : IServiceFactory
     /// <returns>Resolved instances, or an empty sequence if none are registered.</returns>
     public IEnumerable<object> GetInstances(Type serviceType)
     {
-        if (_serviceFactories.TryGetValue(serviceType, out var factories))
+        if (_serviceFactories.TryGetValue(serviceType, out List<Func<object>>? factories))
         {
             return factories.Select(f => f()).ToList();
         }

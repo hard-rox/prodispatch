@@ -1,8 +1,4 @@
-using ProDispatch.Abstractions.Commands;
-using ProDispatch.Abstractions.Dispatcher;
-using ProDispatch.Abstractions.Notifications;
-using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Abstractions.Queries;
+using System.Reflection;
 using ProDispatch.ServiceFactory;
 
 namespace ProDispatch.Dispatcher;
@@ -28,19 +24,19 @@ public class InProcessDispatcher : IDispatcher
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var commandType = command.GetType();
-        var handlerType = typeof(ICommandHandler<>).MakeGenericType(commandType);
+        Type commandType = command.GetType();
+        Type handlerType = typeof(ICommandHandler<>).MakeGenericType(commandType);
         var handler = _serviceFactory.GetInstance(handlerType);
 
-        var pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(commandType, typeof(object));
-        var behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
+        Type pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(commandType, typeof(object));
+        List<object> behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
 
         Func<ICommand, CancellationToken, Task> pipeline = async (cmd, ct) =>
         {
-            var handleMethod = handlerType.GetMethod("HandleAsync")
-                ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
+            MethodInfo handleMethod = handlerType.GetMethod("HandleAsync")
+                                      ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
 
-            await (Task)handleMethod.Invoke(handler, new object?[] { cmd, ct })!;
+            await (Task)handleMethod.Invoke(handler, [cmd, ct])!;
         };
 
         if (behaviors.Count > 0)
@@ -54,12 +50,12 @@ public class InProcessDispatcher : IDispatcher
             foreach (var behavior in behaviors.AsEnumerable().Reverse())
             {
                 var currentBehavior = behavior;
-                var previousPipeline = pipelineWithReturn;
+                Func<ICommand, CancellationToken, Task<object?>> previousPipeline = pipelineWithReturn;
 
                 pipelineWithReturn = async (cmd, ct) =>
                     await (Task<object?>)currentBehavior.GetType()
                         .GetMethod("HandleAsync")!
-                        .Invoke(currentBehavior, new object?[] { cmd, ct, previousPipeline })!;
+                        .Invoke(currentBehavior, [cmd, ct, previousPipeline])!;
             }
 
             await pipelineWithReturn(command, cancellationToken);
@@ -78,30 +74,30 @@ public class InProcessDispatcher : IDispatcher
     {
         ArgumentNullException.ThrowIfNull(command);
 
-        var commandType = command.GetType();
-        var handlerType = typeof(ICommandHandler<,>).MakeGenericType(commandType, typeof(TResult));
+        Type commandType = command.GetType();
+        Type handlerType = typeof(ICommandHandler<,>).MakeGenericType(commandType, typeof(TResult));
         var handler = _serviceFactory.GetInstance(handlerType);
 
-        var pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(commandType, typeof(TResult));
-        var behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
+        Type pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(commandType, typeof(TResult));
+        List<object> behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
 
         Func<ICommand<TResult>, CancellationToken, Task<TResult>> pipeline = async (cmd, ct) =>
         {
-            var handleMethod = handlerType.GetMethod("HandleAsync")
-                ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
+            MethodInfo handleMethod = handlerType.GetMethod("HandleAsync")
+                                      ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
 
-            return (TResult)await (Task<TResult>)handleMethod.Invoke(handler, new object?[] { cmd, ct })!;
+            return (TResult)await (Task<TResult>)handleMethod.Invoke(handler, [cmd, ct])!;
         };
 
         foreach (var behavior in behaviors.AsEnumerable().Reverse())
         {
             var currentBehavior = behavior;
-            var previousPipeline = pipeline;
+            Func<ICommand<TResult>, CancellationToken, Task<TResult>> previousPipeline = pipeline;
 
             pipeline = async (cmd, ct) =>
                 await (Task<TResult>)currentBehavior.GetType()
                     .GetMethod("HandleAsync")!
-                    .Invoke(currentBehavior, new object?[] { cmd, ct, previousPipeline })!;
+                    .Invoke(currentBehavior, [cmd, ct, previousPipeline])!;
         }
 
         return await pipeline(command, cancellationToken);
@@ -115,30 +111,30 @@ public class InProcessDispatcher : IDispatcher
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        var queryType = query.GetType();
-        var handlerType = typeof(IQueryHandler<,>).MakeGenericType(queryType, typeof(TResult));
+        Type queryType = query.GetType();
+        Type handlerType = typeof(IQueryHandler<,>).MakeGenericType(queryType, typeof(TResult));
         var handler = _serviceFactory.GetInstance(handlerType);
 
-        var pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(queryType, typeof(TResult));
-        var behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
+        Type pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(queryType, typeof(TResult));
+        List<object> behaviors = _serviceFactory.GetInstances(pipelineType).ToList();
 
         Func<IQuery<TResult>, CancellationToken, Task<TResult>> pipeline = async (q, ct) =>
         {
-            var handleMethod = handlerType.GetMethod("HandleAsync")
-                ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
+            MethodInfo handleMethod = handlerType.GetMethod("HandleAsync")
+                                      ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
 
-            return (TResult)await (Task<TResult>)handleMethod.Invoke(handler, new object?[] { q, ct })!;
+            return (TResult)await (Task<TResult>)handleMethod.Invoke(handler, [q, ct])!;
         };
 
         foreach (var behavior in behaviors.AsEnumerable().Reverse())
         {
             var currentBehavior = behavior;
-            var previousPipeline = pipeline;
+            Func<IQuery<TResult>, CancellationToken, Task<TResult>> previousPipeline = pipeline;
 
             pipeline = async (q, ct) =>
                 await (Task<TResult>)currentBehavior.GetType()
                     .GetMethod("HandleAsync")!
-                    .Invoke(currentBehavior, new object?[] { q, ct, previousPipeline })!;
+                    .Invoke(currentBehavior, [q, ct, previousPipeline])!;
         }
 
         return await pipeline(query, cancellationToken);
@@ -151,17 +147,17 @@ public class InProcessDispatcher : IDispatcher
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        var notificationType = notification.GetType();
-        var handlerType = typeof(INotificationHandler<>).MakeGenericType(notificationType);
-        var handlers = _serviceFactory.GetInstances(handlerType);
+        Type notificationType = notification.GetType();
+        Type handlerType = typeof(INotificationHandler<>).MakeGenericType(notificationType);
+        IEnumerable<object> handlers = _serviceFactory.GetInstances(handlerType);
 
-        var tasks = new List<Task>();
+        List<Task> tasks = [];
         foreach (var handler in handlers)
         {
-            var handleMethod = handlerType.GetMethod("HandleAsync")
-                ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
+            MethodInfo handleMethod = handlerType.GetMethod("HandleAsync")
+                                      ?? throw new InvalidOperationException($"Handler {handlerType.Name} has no HandleAsync method");
 
-            var task = (Task)handleMethod.Invoke(handler, new object?[] { notification, cancellationToken })!;
+            Task task = (Task)handleMethod.Invoke(handler, [notification, cancellationToken])!;
             tasks.Add(task);
         }
 

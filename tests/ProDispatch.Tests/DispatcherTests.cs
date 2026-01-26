@@ -2,7 +2,6 @@ using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Exceptions;
 using ProDispatch.Abstractions.Notifications;
 using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Abstractions.Queries;
 using ProDispatch.Behaviors;
 using ProDispatch.Dispatcher;
 using ProDispatch.ServiceFactory;
@@ -14,10 +13,10 @@ public class DispatcherTests
     [Fact]
     public async Task SendAsync_CommandWithoutResult_InvokesHandler()
     {
-        var log = new List<string>();
-        var factory = new SimpleServiceFactory();
+        List<string> log = [];
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<TestCommand>>(() => new TestCommandHandler(log));
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
         await dispatcher.SendAsync(new TestCommand("ping"));
 
@@ -27,12 +26,12 @@ public class DispatcherTests
     [Fact]
     public async Task SendAsync_CommandWithPipeline_RunsBehaviorsInReverseRegistrationOrder()
     {
-        var log = new List<string>();
-        var factory = new SimpleServiceFactory();
+        List<string> log = [];
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<TestCommand>>(() => new TestCommandHandler(log));
         factory.Register(typeof(IPipelineBehavior<TestCommand, object>), () => new RecordingBehavior<TestCommand>(log, "outer"));
         factory.Register(typeof(IPipelineBehavior<TestCommand, object>), () => new RecordingBehavior<TestCommand>(log, "inner"));
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
         await dispatcher.SendAsync(new TestCommand("order"));
 
@@ -42,9 +41,9 @@ public class DispatcherTests
     [Fact]
     public async Task SendAsync_CommandWithResult_ReturnsValue()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<ResultCommand, int>>(() => new ResultCommandHandler());
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
         var result = await dispatcher.SendAsync(new ResultCommand(41));
 
@@ -54,11 +53,11 @@ public class DispatcherTests
     [Fact]
     public async Task PublishAsync_InvokesAllHandlers()
     {
-        var log = new List<string>();
-        var factory = new SimpleServiceFactory();
+        List<string> log = [];
+        SimpleServiceFactory factory = new();
         factory.Register<INotificationHandler<TestNotification>>(() => new RecordingNotificationHandler(log, "first"));
         factory.Register<INotificationHandler<TestNotification>>(() => new RecordingNotificationHandler(log, "second"));
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
         await dispatcher.PublishAsync(new TestNotification("event"));
 
@@ -68,12 +67,12 @@ public class DispatcherTests
     [Fact]
     public async Task ValidationBehavior_ThrowsOnInvalidRequest()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<ValidatedCommand>>(() => new ValidatedCommandHandler());
         factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
-        var act = () => dispatcher.SendAsync(new ValidatedCommand(string.Empty));
+        Func<Task> act = () => dispatcher.SendAsync(new ValidatedCommand(string.Empty));
 
         await Assert.ThrowsAsync<ValidationException>(act);
     }
@@ -81,10 +80,10 @@ public class DispatcherTests
     [Fact]
     public async Task ValidationBehavior_AllowsValidRequest()
     {
-        var factory = new SimpleServiceFactory();
+        SimpleServiceFactory factory = new();
         factory.Register<ICommandHandler<ValidatedCommand>>(() => new ValidatedCommandHandler());
         factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
-        var dispatcher = new InProcessDispatcher(factory);
+        InProcessDispatcher dispatcher = new(factory);
 
         await dispatcher.SendAsync(new ValidatedCommand("ok"));
     }

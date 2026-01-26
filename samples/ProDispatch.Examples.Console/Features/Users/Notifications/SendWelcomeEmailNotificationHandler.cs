@@ -1,5 +1,3 @@
-using ProDispatch.Abstractions.Notifications;
-
 namespace ProDispatch.Examples.Console.Features.Users.Notifications;
 
 public class SendWelcomeEmailNotificationHandler : INotificationHandler<UserCreatedNotification>

@@ -1,17 +1,15 @@
-using ProDispatch.Abstractions.Queries;
-
 namespace ProDispatch.Examples.Console.Features.Users.Queries;
 
 public class GetUserByIdQueryHandler : IQueryHandler<GetUserByIdQuery, UserDto>
 {
     private static readonly Dictionary<Guid, UserDto> Users = new()
     {
-        [new Guid("00000000-0000-0000-0000-000000000001")] = new(
-            new Guid("00000000-0000-0000-0000-000000000001"),
+        [new("00000000-0000-0000-0000-000000000001")] = new(
+            new("00000000-0000-0000-0000-000000000001"),
             "john_doe",
             "john@example.com"),
-        [new Guid("00000000-0000-0000-0000-000000000002")] = new(
-            new Guid("00000000-0000-0000-0000-000000000002"),
+        [new("00000000-0000-0000-0000-000000000002")] = new(
+            new("00000000-0000-0000-0000-000000000002"),
             "jane_smith",
             "jane@example.com"),
     };
@@ -20,7 +18,7 @@ public class GetUserByIdQueryHandler : IQueryHandler<GetUserByIdQuery, UserDto>
     {
         System.Console.WriteLine($"[QUERY] Fetching user with ID: {query.Id}");
 
-        if (Users.TryGetValue(query.Id, out var user))
+        if (Users.TryGetValue(query.Id, out UserDto? user))
         {
             return Task.FromResult(user);
         }

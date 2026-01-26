@@ -1,22 +1,13 @@
-using ProDispatch.Abstractions.Commands;
-using ProDispatch.Abstractions.Validation;
-
 namespace ProDispatch.Examples.Console.Features.Users.Commands;
 
-public class CreateUserCommand : ICommand, IValidatable
+public class CreateUserCommand(string userName, string email) : ICommand, IValidatable
 {
-    public CreateUserCommand(string userName, string email)
-    {
-        UserName = userName;
-        Email = email;
-    }
-
-    public string UserName { get; }
-    public string Email { get; }
+    public string UserName { get; } = userName;
+    public string Email { get; } = email;
 
     public IEnumerable<string> Validate()
     {
-        var errors = new List<string>();
+        List<string> errors = new();
 
         if (string.IsNullOrWhiteSpace(UserName))
             errors.Add("UserName is required");

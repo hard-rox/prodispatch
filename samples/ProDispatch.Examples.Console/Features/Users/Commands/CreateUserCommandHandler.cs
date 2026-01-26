@@ -1,21 +1,14 @@
-using ProDispatch.Abstractions.Commands;
-using ProDispatch.Abstractions.Dispatcher;
 using ProDispatch.Examples.Console.Features.Users.Notifications;
 
 namespace ProDispatch.Examples.Console.Features.Users.Commands;
 
-public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
+public class CreateUserCommandHandler(IDispatcher dispatcher) : ICommandHandler<CreateUserCommand>
 {
-    private readonly IDispatcher _dispatcher;
-
-    public CreateUserCommandHandler(IDispatcher dispatcher)
-    {
-        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
-    }
+    private readonly IDispatcher _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
     public async Task HandleAsync(CreateUserCommand command, CancellationToken cancellationToken = default)
     {
-        var userId = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
 
         System.Console.WriteLine($"[USER] Creating user: {command.UserName} ({command.Email})");
 

@@ -14,9 +14,9 @@ public class EndToEndTests
     [Fact]
     public async Task Executes_command_notification_and_query()
     {
-        var events = new List<string>();
-        var store = new InMemoryUserStore();
-        var factory = new SimpleServiceFactory();
+        List<string> events = [];
+        InMemoryUserStore store = new();
+        SimpleServiceFactory factory = new();
         InProcessDispatcher? dispatcher = null;
 
         factory.Register<ICommandHandler<CreateUser>>(() => new CreateUserHandler(store, () => dispatcher!));
@@ -27,12 +27,12 @@ public class EndToEndTests
         factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new ValidationBehavior<CreateUser, object>());
         factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new TrackingBehavior<CreateUser>(events, "create"));
 
-        dispatcher = new InProcessDispatcher(factory);
+        dispatcher = new(factory);
 
-        var command = new CreateUser("alice", "alice@example.com");
+        CreateUser command = new("alice", "alice@example.com");
         await dispatcher.SendAsync(command);
 
-        var user = await dispatcher.SendAsync(new GetUserById(store.LastUserId));
+        UserDto user = await dispatcher.SendAsync(new GetUserById(store.LastUserId));
 
         Assert.Equal("alice", user.UserName);
         Assert.Contains("notification:alice", events);
@@ -54,8 +54,8 @@ public class EndToEndTests
     {
         public async Task HandleAsync(CreateUser command, CancellationToken cancellationToken = default)
         {
-            var id = Guid.NewGuid();
-            store.Add(new UserDto(id, command.UserName, command.Email));
+            Guid id = Guid.NewGuid();
+            store.Add(new(id, command.UserName, command.Email));
             await dispatcherAccessor().PublishAsync(new UserCreated(id, command.UserName), cancellationToken);
         }
     }

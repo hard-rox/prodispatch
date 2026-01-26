@@ -1,17 +1,12 @@
 namespace ProDispatch.Examples.MinimalApi.Features.Users.Commands;
 
-public class CreateUserHandler : ICommandHandler<CreateUser>
+public class CreateUserHandler(IDispatcher dispatcher) : ICommandHandler<CreateUser>
 {
-    private readonly IDispatcher _dispatcher;
-
-    public CreateUserHandler(IDispatcher dispatcher)
-    {
-        _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
-    }
+    private readonly IDispatcher _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 
     public async Task HandleAsync(CreateUser command, CancellationToken cancellationToken = default)
     {
-        var userId = Guid.NewGuid();
+        Guid userId = Guid.NewGuid();
         Console.WriteLine($"[USER] Creating user: {command.UserName} ({command.Email}) with ID: {userId}");
 
         // Simulate user creation
