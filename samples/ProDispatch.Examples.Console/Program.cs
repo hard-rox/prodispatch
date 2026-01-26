@@ -1,4 +1,5 @@
 using ProDispatch.Abstractions.Exceptions;
+using ProDispatch.Examples.Console.Behaviors;
 using ProDispatch.Examples.Console.Features.Users.Commands;
 using ProDispatch.Examples.Console.Features.Users.Notifications;
 using ProDispatch.Examples.Console.Features.Users.Queries;

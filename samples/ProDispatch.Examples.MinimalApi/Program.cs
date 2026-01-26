@@ -1,3 +1,5 @@
+using ProDispatch.Examples.MinimalApi.Behaviors;
+
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 // Add OpenAPI/Swagger

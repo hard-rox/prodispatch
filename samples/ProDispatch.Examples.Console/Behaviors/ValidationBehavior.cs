@@ -1,4 +1,4 @@
-namespace ProDispatch.Behaviors;
+namespace ProDispatch.Examples.Console.Behaviors;
 
 /// <summary>
 /// Pipeline behavior that validates requests implementing IValidatable.

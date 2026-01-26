@@ -1,4 +1,4 @@
-namespace ProDispatch.Behaviors;
+namespace ProDispatch.Examples.MinimalApi.Behaviors;
 
 /// <summary>
 /// Pipeline behavior that logs request handling details.

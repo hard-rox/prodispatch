@@ -3,6 +3,9 @@
 ## Overview
 Enhanced the ProDispatch.Examples.MinimalApi project with comprehensive pipeline behaviors, multiple notification handlers, and interactive API documentation browsing.
 
+## Architecture Note
+**LoggingBehavior and ValidationBehavior** have been moved from the core library (`src/ProDispatch/Behaviors/`) to the sample projects. They are **example implementations** demonstrating common patterns, not core framework components. Each sample project contains its own copy in `Behaviors/`.
+
 ## New Files
 
 ### 1. TimingBehavior.cs
