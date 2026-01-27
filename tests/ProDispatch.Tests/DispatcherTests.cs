@@ -2,7 +2,6 @@ using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Exceptions;
 using ProDispatch.Abstractions.Notifications;
 using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Behaviors;
 using ProDispatch.Dispatcher;
 using ProDispatch.ServiceFactory;
 
@@ -149,4 +148,23 @@ public class DispatcherTests
             return Task.CompletedTask;
         }
     }
-}
+
+    private sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    {
+        public async Task<TResponse> HandleAsync(
+            TRequest request,
+            CancellationToken cancellationToken,
+            Func<TRequest, CancellationToken, Task<TResponse>> next)
+        {
+            if (request is ProDispatch.Abstractions.Validation.IValidatable validatable)
+            {
+                List<string> errors = validatable.Validate().ToList();
+                if (errors.Count > 0)
+                {
+                    throw new ValidationException(errors);
+                }
+            }
+
+            return await next(request!, cancellationToken);
+        }
+    }}

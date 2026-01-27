@@ -1,3 +1,6 @@
+using ProDispatch.Abstractions.Exceptions;
+using ProDispatch.Abstractions.Validation;
+
 namespace ProDispatch.Examples.Console.Behaviors;
 
 /// <summary>
@@ -20,11 +23,11 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
             List<string> errors = validatable.Validate().ToList();
             if (errors.Count > 0)
             {
-                Console.WriteLine($"[VALIDATION] Validation failed for {request.GetType().Name}");
+                System.Console.WriteLine($"[VALIDATION] Validation failed for {request.GetType().Name}");
                 throw new ValidationException(errors);
             }
 
-            Console.WriteLine($"[VALIDATION] Validation passed for {request.GetType().Name}");
+            System.Console.WriteLine($"[VALIDATION] Validation passed for {request.GetType().Name}");
         }
 
         return await next(request!, cancellationToken);

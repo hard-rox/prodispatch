@@ -3,7 +3,8 @@ using ProDispatch.Abstractions.Dispatcher;
 using ProDispatch.Abstractions.Notifications;
 using ProDispatch.Abstractions.Pipeline;
 using ProDispatch.Abstractions.Queries;
-using ProDispatch.Behaviors;
+using ProDispatch.Abstractions.Exceptions;
+using ProDispatch.Abstractions.Validation;
 using ProDispatch.Dispatcher;
 using ProDispatch.ServiceFactory;
 
@@ -78,6 +79,54 @@ public class EndToEndTests
         {
             events.Add($"notification:{notification.UserName}");
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    {
+        public async Task<TResponse> HandleAsync(
+            TRequest request,
+            CancellationToken cancellationToken,
+            Func<TRequest, CancellationToken, Task<TResponse>> next)
+        {
+            var requestType = request?.GetType().Name ?? "Unknown";
+            DateTime startTime = DateTime.UtcNow;
+
+            System.Console.WriteLine($"[LOG] Starting request: {requestType}");
+
+            try
+            {
+                TResponse response = await next(request!, cancellationToken);
+                TimeSpan duration = DateTime.UtcNow - startTime;
+                System.Console.WriteLine($"[LOG] Completed request: {requestType} (Duration: {duration.TotalMilliseconds}ms)");
+                return response;
+            }
+            catch (Exception ex)
+            {
+                TimeSpan duration = DateTime.UtcNow - startTime;
+                System.Console.WriteLine($"[LOG] Failed request: {requestType} (Duration: {duration.TotalMilliseconds}ms, Error: {ex.Message})");
+                throw;
+            }
+        }
+    }
+
+    private sealed class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    {
+        public async Task<TResponse> HandleAsync(
+            TRequest request,
+            CancellationToken cancellationToken,
+            Func<TRequest, CancellationToken, Task<TResponse>> next)
+        {
+            if (request is IValidatable validatable)
+            {
+                List<string> errors = validatable.Validate().ToList();
+                if (errors.Count > 0)
+                {
+                    throw new ValidationException(errors);
+                }
+            }
+
+            return await next(request!, cancellationToken);
         }
     }
 

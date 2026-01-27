@@ -1,9 +1,15 @@
+global using System;
+global using System.Collections.Generic;
 global using ProDispatch.Abstractions.Commands;
 global using ProDispatch.Abstractions.Dispatcher;
+global using ProDispatch.Abstractions.Exceptions;
 global using ProDispatch.Abstractions.Notifications;
 global using ProDispatch.Abstractions.Pipeline;
 global using ProDispatch.Abstractions.Queries;
 global using ProDispatch.Abstractions.Validation;
-global using ProDispatch.Behaviors;
 global using ProDispatch.Dispatcher;
+global using ProDispatch.Examples.Console.Behaviors;
+global using ProDispatch.Examples.Console.Features.Users.Commands;
+global using ProDispatch.Examples.Console.Features.Users.Notifications;
+global using ProDispatch.Examples.Console.Features.Users.Queries;
 global using ProDispatch.ServiceFactory;

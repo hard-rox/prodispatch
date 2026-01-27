@@ -18,19 +18,19 @@ public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, 
         var requestType = request?.GetType().Name ?? "Unknown";
         DateTime startTime = DateTime.UtcNow;
 
-        Console.WriteLine($"[LOG] Starting request: {requestType}");
+        System.Console.WriteLine($"[LOG] Starting request: {requestType}");
 
         try
         {
             TResponse response = await next(request!, cancellationToken);
             TimeSpan duration = DateTime.UtcNow - startTime;
-            Console.WriteLine($"[LOG] Completed request: {requestType} (Duration: {duration.TotalMilliseconds}ms)");
+            System.Console.WriteLine($"[LOG] Completed request: {requestType} (Duration: {duration.TotalMilliseconds}ms)");
             return response;
         }
         catch (Exception ex)
         {
             TimeSpan duration = DateTime.UtcNow - startTime;
-            Console.WriteLine($"[LOG] Failed request: {requestType} (Duration: {duration.TotalMilliseconds}ms, Error: {ex.Message})");
+            System.Console.WriteLine($"[LOG] Failed request: {requestType} (Duration: {duration.TotalMilliseconds}ms, Error: {ex.Message})");
             throw;
         }
     }
