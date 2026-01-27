@@ -1,0 +1,9 @@
+global using System.Collections.Generic;
+global using System.Threading.Tasks;
+global using ProDispatch.Abstractions.Commands;
+global using ProDispatch.Abstractions.Dispatcher;
+global using ProDispatch.Abstractions.Exceptions;
+global using ProDispatch.Abstractions.Notifications;
+global using ProDispatch.Abstractions.Pipeline;
+global using ProDispatch.Abstractions.Queries;
+global using ProDispatch.Abstractions.Validation;

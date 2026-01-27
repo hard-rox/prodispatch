@@ -1,0 +1,50 @@
+## Build outputs
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+## IDE settings
+.vs/
+.vscode/
+.idea/
+*.sln.iml
+*.user
+*.userprefs
+*.suo
+*.rsuser
+*.sln.docstates
+*.code-workspace
+
+## Logs and coverage
+*.log
+logs/
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage*/
+
+## Packages
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+packages/
+project.lock.json
+project.fragment.lock.json
+.nuget/NuGet.exe
+
+## BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+## Sonar
+.sonar/
+.scannerwork/
+
+## OS junk
+.DS_Store
+Thumbs.db
