@@ -1,10 +1,21 @@
+using ProDispatch.Abstractions.Requests;
+using UnitType = ProDispatch.Abstractions.Unit.Unit;
+
 namespace ProDispatch.Abstractions.Dispatcher;
 
 /// <summary>
-/// In-process dispatcher interface for sending commands, queries, and publishing notifications.
+/// In-process dispatcher interface for sending requests, commands, queries, and publishing notifications.
+/// Supports MediatR-like IRequest/IRequestHandler as well as CQRS-style ICommand/IQuery patterns.
 /// </summary>
 public interface IDispatcher
 {
+    /// <summary>Sends a request and returns a result.</summary>
+    /// <typeparam name="TResponse">Request result type.</typeparam>
+    /// <param name="request">Request to execute.</param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>Request result.</returns>
+    Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default);
+
     /// <summary>Sends a command without a result.</summary>
     /// <param name="command">Command to execute.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>

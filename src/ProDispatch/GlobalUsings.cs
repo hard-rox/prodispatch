@@ -6,4 +6,5 @@ global using ProDispatch.Abstractions.Exceptions;
 global using ProDispatch.Abstractions.Notifications;
 global using ProDispatch.Abstractions.Pipeline;
 global using ProDispatch.Abstractions.Queries;
+global using ProDispatch.Abstractions.Requests;
 global using ProDispatch.Abstractions.Validation;

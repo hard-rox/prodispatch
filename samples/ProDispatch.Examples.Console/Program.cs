@@ -18,6 +18,7 @@ serviceFactory.Register<INotificationHandler<UserCreatedNotification>>(() => new
 serviceFactory.Register<INotificationHandler<UserCreatedNotification>>(() => new SendWelcomeEmailNotificationHandler());
 
 // Register pipeline behaviors
+// Logging and validation for create command
 serviceFactory.Register(
     typeof(IPipelineBehavior<CreateUserCommand, object>),
     () => new LoggingBehavior<CreateUserCommand, object>());
@@ -26,6 +27,12 @@ serviceFactory.Register(
     typeof(IPipelineBehavior<CreateUserCommand, object>),
     () => new ValidationBehavior<CreateUserCommand, object>());
 
+// Command-scoped behavior (only runs for CreateUserCommand)
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUserCommand, object>),
+    () => new CommandOnlyBehavior<CreateUserCommand, object>());
+
+// Behaviors for update command
 serviceFactory.Register(
     typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
     () => new LoggingBehavior<UpdateUserEmailCommand, bool>());
@@ -34,9 +41,20 @@ serviceFactory.Register(
     typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
     () => new ValidationBehavior<UpdateUserEmailCommand, bool>());
 
+// Command-scoped behavior (only runs for UpdateUserEmailCommand)
+serviceFactory.Register(
+    typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
+    () => new CommandOnlyBehavior<UpdateUserEmailCommand, bool>());
+
+// Behaviors for query
 serviceFactory.Register(
     typeof(IPipelineBehavior<GetUserByIdQuery, UserDto>),
     () => new LoggingBehavior<GetUserByIdQuery, UserDto>());
+
+// Query-scoped behavior (only runs for GetUserByIdQuery)
+serviceFactory.Register(
+    typeof(IPipelineBehavior<GetUserByIdQuery, UserDto>),
+    () => new QueryOnlyBehavior<GetUserByIdQuery, UserDto>());
 
 // Create dispatcher instance
 dispatcher = new(serviceFactory);
