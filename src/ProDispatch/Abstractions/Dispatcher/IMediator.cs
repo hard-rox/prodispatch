@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace ProDispatch.Abstractions.Dispatcher;
 
 /// <summary>
@@ -7,6 +9,7 @@ namespace ProDispatch.Abstractions.Dispatcher;
 /// This interface provides backward compatibility for projects migrating from MediatR.
 /// </summary>
 [Obsolete("Use IDispatcher instead. IMediator will be removed in a future version.", false)]
+[SuppressMessage("Major Code Smell", "S1133:Deprecated code should be removed", Justification = "Obsolete attribute intentionally used for migration path")]
 public interface IMediator : IDispatcher
 {
 }

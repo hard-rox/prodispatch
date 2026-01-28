@@ -51,20 +51,18 @@ public class InProcessDispatcher : IDispatcher
         List<(object behavior, bool isObjectTyped)> behaviors = [];
         Type pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(requestType, typeof(TResponse));
         
-        foreach (var b in _serviceFactory.GetInstances(pipelineType))
-        {
-            if (ShouldApplyBehavior(b, request))
-                behaviors.Add((b, false));
-        }
+        behaviors.AddRange(
+            _serviceFactory.GetInstances(pipelineType)
+                .Where(b => ShouldApplyBehavior(b, request))
+                .Select(b => (behavior: b, isObjectTyped: false)));
         
         if (typeof(TResponse) == typeof(UnitType))
         {
             Type objectPipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(requestType, typeof(object));
-            foreach (var b in _serviceFactory.GetInstances(objectPipelineType))
-            {
-                if (ShouldApplyBehavior(b, request))
-                    behaviors.Add((b, true));
-            }
+            behaviors.AddRange(
+                _serviceFactory.GetInstances(objectPipelineType)
+                    .Where(b => ShouldApplyBehavior(b, request))
+                    .Select(b => (behavior: b, isObjectTyped: true)));
         }
 
         Func<IRequest<TResponse>, CancellationToken, Task<TResponse>> pipeline = async (req, ct) =>
@@ -162,7 +160,10 @@ public class InProcessDispatcher : IDispatcher
             {
                 return _serviceFactory.GetInstance(commandHandlerType);
             }
-            catch (InvalidOperationException) { }
+            catch (InvalidOperationException)
+            {
+                // Handler not found, try next fallback type
+            }
         }
         
         // Check if it's a command with result
@@ -173,7 +174,10 @@ public class InProcessDispatcher : IDispatcher
             {
                 return _serviceFactory.GetInstance(commandHandlerType);
             }
-            catch (InvalidOperationException) { }
+            catch (InvalidOperationException)
+            {
+                // Handler not found, try next fallback type
+            }
         }
         
         // Check if it's a query
@@ -184,7 +188,10 @@ public class InProcessDispatcher : IDispatcher
             {
                 return _serviceFactory.GetInstance(queryHandlerType);
             }
-            catch (InvalidOperationException) { }
+            catch (InvalidOperationException)
+            {
+                // Handler not found, return null to throw appropriate error
+            }
         }
         
         return null;
