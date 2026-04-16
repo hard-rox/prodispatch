@@ -25,7 +25,7 @@ jobs:
       - name: Test
         run: dotnet test ProDispatch.slnx --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
+        uses: SonarSource/sonarcloud-github-action@v5
         with:
           args: >
             -Dsonar.projectKey=ProDispatch
