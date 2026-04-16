@@ -16,18 +16,26 @@ serviceFactory.Register<INotificationHandler<UserCreated>>(() => new UserCreated
 serviceFactory.Register<INotificationHandler<UserCreated>>(() => new SendWelcomeEmailNotificationHandler());
 
 // Register pipeline behaviors (outermost first)
+// Behaviors for all requests
 serviceFactory.Register(
     typeof(IPipelineBehavior<CreateUser, object>),
     () => new LoggingBehavior<CreateUser, object>());
 
 serviceFactory.Register(
     typeof(IPipelineBehavior<CreateUser, object>),
-    () => new ValidationBehavior<CreateUser, object>());
-
-serviceFactory.Register(
-    typeof(IPipelineBehavior<CreateUser, object>),
     () => new TimingBehavior<CreateUser, object>());
 
+// Behavior scoped to commands only
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUser, object>),
+    () => new CommandOnlyBehavior<CreateUser, object>());
+
+// Behavior scoped to commands only (validation)
+serviceFactory.Register(
+    typeof(IPipelineBehavior<CreateUser, object>),
+    () => new ValidationBehavior<CreateUser, object>());
+
+// Behaviors for query
 serviceFactory.Register(
     typeof(IPipelineBehavior<GetUserById, UserDto>),
     () => new LoggingBehavior<GetUserById, UserDto>());
@@ -35,6 +43,11 @@ serviceFactory.Register(
 serviceFactory.Register(
     typeof(IPipelineBehavior<GetUserById, UserDto>),
     () => new TimingBehavior<GetUserById, UserDto>());
+
+// Behavior scoped to queries only
+serviceFactory.Register(
+    typeof(IPipelineBehavior<GetUserById, UserDto>),
+    () => new QueryOnlyBehavior<GetUserById, UserDto>());
 
 // Create dispatcher instance
 dispatcher = new(serviceFactory);
