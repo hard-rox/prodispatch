@@ -10,7 +10,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="Scalar.AspNetCore" Version="2.12.18" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.18.0.131500" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.24.0.138807" />
     <PackageVersion Include="coverlet.collector" Version="8.0.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
