@@ -1,57 +1,82 @@
-
 name: CI
-
+ 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
-
+ 
 jobs:
-  build:
+  lint-build-test-sonarscan:
     runs-on: ubuntu-latest
     env:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
-
+ 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
-
+ 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-
+ 
       - name: Restore
         run: dotnet restore ProDispatch.slnx
-
+ 
+      - name: Verify formatting
+        run: dotnet format ProDispatch.slnx --verify-no-changes --no-restore
+ 
+      - name: Install SonarScanner for .NET
+        run: dotnet tool install --global dotnet-sonarscanner
+ 
+      - name: Begin SonarCloud analysis
+        run: >
+          dotnet sonarscanner begin
+          /k:"hard-rox_prodispatch"
+          /o:"hard-rox"
+          /n:"ProDispatch"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.token="$SONAR_TOKEN"
+          /d:sonar.exclusions="**/bin/**,**/obj/**,**/*.cshtml"
+          /d:sonar.cs.opencover.reportsPaths="**/TestResults/**/coverage.opencover.xml"
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+ 
       - name: Build
         run: >
           dotnet build ProDispatch.slnx
           --configuration Release
           --no-restore
-
+          --no-incremental
+          --disable-build-servers
+ 
       - name: Test
         run: >
           dotnet test ProDispatch.slnx
           --configuration Release
           --no-build
-          /p:CollectCoverage=true
-          /p:CoverletOutputFormat=opencover
-
+          --collect:"XPlat Code Coverage"
+          --
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+ 
       - name: Verify coverage reports
-        run: find . -name 'coverage.opencover.xml' -print
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
-        with:
-          args: >
-            -Dsonar.projectKey=hard-rox_prodispatch
-            -Dsonar.organization=hard-rox
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+        shell: bash
+        run: |
+          for project in tests/ProDispatch.Tests tests/ProDispatch.IntegrationTests; do
+            report=$(find "$project/TestResults" -type f -name 'coverage.opencover.xml' -print -quit)
+            if [[ -z "$report" || ! -s "$report" ]]; then
+              echo "::error::Missing or empty OpenCover report for $project"
+              exit 1
+            fi
+            echo "$report"
+          done
+ 
+      - name: End SonarCloud analysis
+        run: dotnet sonarscanner end /d:sonar.token="$SONAR_TOKEN"
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+ 
