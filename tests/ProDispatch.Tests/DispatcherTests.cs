@@ -2,8 +2,9 @@ using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Exceptions;
 using ProDispatch.Abstractions.Notifications;
 using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Dispatcher;
-using ProDispatch.ServiceFactory;
+using Microsoft.Extensions.DependencyInjection;
+using ProDispatch.Abstractions.Dispatcher;
+using ProDispatch.DependencyInjection;
 
 namespace ProDispatch.Tests;
 
@@ -13,9 +14,8 @@ public class DispatcherTests
     public async Task SendAsync_CommandWithoutResult_InvokesHandler()
     {
         List<string> log = [];
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<TestCommand>>(() => new TestCommandHandler(log));
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider(log);
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         await dispatcher.SendAsync(new TestCommand("ping"), CancellationToken.None);
 
@@ -23,14 +23,15 @@ public class DispatcherTests
     }
 
     [Fact]
-    public async Task SendAsync_CommandWithPipeline_RunsBehaviorsInReverseRegistrationOrder()
+    public async Task SendAsync_CommandWithPipeline_RunsFirstRegisteredOutermost()
     {
         List<string> log = [];
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<TestCommand>>(() => new TestCommandHandler(log));
-        factory.Register(typeof(IPipelineBehavior<TestCommand, object>), () => new RecordingBehavior<TestCommand>(log, "outer"));
-        factory.Register(typeof(IPipelineBehavior<TestCommand, object>), () => new RecordingBehavior<TestCommand>(log, "inner"));
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider(log, cfg =>
+        {
+            cfg.AddBehavior<OuterRecordingBehavior>();
+            cfg.AddBehavior<InnerRecordingBehavior>();
+        });
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         await dispatcher.SendAsync(new TestCommand("order"), CancellationToken.None);
 
@@ -40,9 +41,8 @@ public class DispatcherTests
     [Fact]
     public async Task SendAsync_CommandWithResult_ReturnsValue()
     {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<ResultCommand, int>>(() => new ResultCommandHandler());
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider([]);
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         var result = await dispatcher.SendAsync(new ResultCommand(41), CancellationToken.None);
 
@@ -53,23 +53,19 @@ public class DispatcherTests
     public async Task PublishAsync_InvokesAllHandlers()
     {
         List<string> log = [];
-        SimpleServiceFactory factory = new();
-        factory.Register<INotificationHandler<TestNotification>>(() => new RecordingNotificationHandler(log, "first"));
-        factory.Register<INotificationHandler<TestNotification>>(() => new RecordingNotificationHandler(log, "second"));
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider(log);
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         await dispatcher.PublishAsync(new TestNotification("event"), CancellationToken.None);
 
-        Assert.Equal(new[] { "first:event", "second:event" }, log);
+        Assert.Equal(new[] { "first:event", "second:event" }, log.Order());
     }
 
     [Fact]
     public async Task ValidationBehavior_ThrowsOnInvalidRequest()
     {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<ValidatedCommand>>(() => new ValidatedCommandHandler());
-        factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider([], cfg => cfg.AddBehavior<ValidationBehavior<ValidatedCommand, object>>());
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         Func<Task> act = () => dispatcher.SendAsync(new ValidatedCommand(string.Empty));
 
@@ -79,12 +75,22 @@ public class DispatcherTests
     [Fact]
     public async Task ValidationBehavior_AllowsValidRequest()
     {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<ValidatedCommand>>(() => new ValidatedCommandHandler());
-        factory.Register(typeof(IPipelineBehavior<ValidatedCommand, object>), () => new ValidationBehavior<ValidatedCommand, object>());
-        InProcessDispatcher dispatcher = new(factory);
+        using ServiceProvider provider = BuildProvider([], cfg => cfg.AddBehavior<ValidationBehavior<ValidatedCommand, object>>());
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         await dispatcher.SendAsync(new ValidatedCommand("ok"), CancellationToken.None);
+    }
+
+    private static ServiceProvider BuildProvider(List<string> log, Action<ProDispatchServiceConfiguration>? configure = null)
+    {
+        ServiceCollection services = new();
+        services.AddSingleton(log);
+        services.AddProDispatch(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(typeof(DispatcherTests).Assembly);
+            configure?.Invoke(cfg);
+        });
+        return services.BuildServiceProvider();
     }
 
     private sealed record TestCommand(string Payload) : ICommand;
@@ -98,7 +104,7 @@ public class DispatcherTests
         }
     }
 
-    private sealed class RecordingBehavior<TRequest>(List<string> log, string name) : IPipelineBehavior<TRequest, object>
+    private abstract class RecordingBehavior<TRequest>(List<string> log, string name) : IPipelineBehavior<TRequest, object>
     {
         public async Task<object> HandleAsync(TRequest request, CancellationToken cancellationToken, Func<TRequest, CancellationToken, Task<object>> next)
         {
@@ -108,6 +114,10 @@ public class DispatcherTests
             return result;
         }
     }
+
+    private sealed class OuterRecordingBehavior(List<string> log) : RecordingBehavior<TestCommand>(log, "outer");
+
+    private sealed class InnerRecordingBehavior(List<string> log) : RecordingBehavior<TestCommand>(log, "inner");
 
     private sealed record ResultCommand(int Value) : ICommand<int>;
 
@@ -121,11 +131,20 @@ public class DispatcherTests
 
     private sealed record TestNotification(string Name) : INotification;
 
-    private sealed class RecordingNotificationHandler(List<string> log, string id) : INotificationHandler<TestNotification>
+    private sealed class RecordingNotificationHandler(List<string> log) : INotificationHandler<TestNotification>
     {
         public Task HandleAsync(TestNotification notification, CancellationToken cancellationToken = default)
         {
-            log.Add($"{id}:{notification.Name}");
+            log.Add($"first:{notification.Name}");
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class SecondRecordingNotificationHandler(List<string> log) : INotificationHandler<TestNotification>
+    {
+        public Task HandleAsync(TestNotification notification, CancellationToken cancellationToken = default)
+        {
+            log.Add($"second:{notification.Name}");
             return Task.CompletedTask;
         }
     }
@@ -167,4 +186,5 @@ public class DispatcherTests
 
             return await next(request!, cancellationToken);
         }
-    }}
+    }
+}

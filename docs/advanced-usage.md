@@ -1,9 +1,10 @@
 # Advanced Usage
 
 ## Pipeline Behaviors
-- Register behaviors per request type; the dispatcher wraps them in reverse registration order.
-- Outer behaviors are registered **last**; innermost registered **first**.
-- Typical order: handler -> validation -> caching -> logging/metrics (inner to outer).
+- Add closed behaviors with `cfg.AddBehavior<TBehavior>()` or open generic behaviors with `cfg.AddOpenBehavior(typeof(Behavior<,>))`.
+- The first added behavior is **outermost**; the last is closest to the handler.
+- For example, add logging, caching, then validation to execute them in that order before the handler, unwinding in reverse.
+- Behaviors are not assembly-scanned. Repeated registration of the same service/implementation pair is deduplicated; use distinct implementation types for separate stages.
 - **Note:** Example behaviors (LoggingBehavior, ValidationBehavior, CommandOnlyBehavior, QueryOnlyBehavior) are provided in the sample projects under `Behaviors/` directory. They demonstrate common patterns but are not part of the core library.
 
 ## Scoped Pipeline Behaviors
@@ -77,33 +78,30 @@ public record CreateUserCommand(string Name, string Email) : ICommand, IValidata
 ```
 
 ## DI Integration
-Swap SimpleServiceFactory with your DI container of choice by implementing IServiceFactory:
+ProDispatch directly references `Microsoft.Extensions.DependencyInjection.Abstractions`. Register services on `IServiceCollection` and resolve `IDispatcher` through the application's `IServiceProvider`:
 
 ```csharp
-public class DIServiceFactory : IServiceFactory
-{
-    private readonly IServiceProvider _provider;
-    
-    public DIServiceFactory(IServiceProvider provider)
-    {
-        _provider = provider;
-    }
-    
-    public object GetInstance(Type serviceType) => 
-        _provider.GetRequiredService(serviceType);
-    
-    public IEnumerable<object> GetInstances(Type serviceType) => 
-        _provider.GetServices(serviceType);
-}
-
-// Usage
 var services = new ServiceCollection();
-services.AddTransient<IRequestHandler<GetUserQuery, User>, GetUserQueryHandler>();
-var provider = services.BuildServiceProvider();
-var dispatcher = new InProcessDispatcher(new DIServiceFactory(provider));
+services.AddScoped<IUserRepository, UserRepository>();
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+
+using var provider = services.BuildServiceProvider();
+using var scope = provider.CreateScope();
+var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
 ```
 
-Preserve multiple registrations for notifications (use `GetServices` for fan-out).
+Discovered handlers and the dispatcher are transient. Their dependencies are resolved from the caller's scope, so do not capture a dispatcher in a singleton when handlers need scoped dependencies. ProDispatch never builds or disposes an application provider.
+
+Call `RegisterServicesFromAssembly` for each assembly containing handlers. Only concrete, closed handler implementations are scanned, including non-public types with public constructors. Open generic handler expansion is not supported. Scanning does not instantiate handlers.
+
+Assembly inputs and handler registrations are deduplicated. Single-handler defaults use `TryAdd`, preserving an application registration made before `AddProDispatch`; later explicit registrations follow standard Microsoft DI override semantics. When multiple implementations exist for a single-handler contract, scanning selects the first by ordinal type full name. Prefer an explicit registration when choosing an override.
+
+All distinct notification handlers are retained. Pipeline and notification collections preserve registration order, although notification completion order is not guaranteed.
 
 ## Notifications
 PublishAsync fans out to all handlers. Keep handlers idempotent and fast; they run in-process and are awaited together.
@@ -129,9 +127,7 @@ public class LogUserCreationHandler : INotificationHandler<UserCreatedNotificati
     }
 }
 
-// Register both handlers
-factory.Register<INotificationHandler<UserCreatedNotification>>(() => new SendWelcomeEmailHandler());
-factory.Register<INotificationHandler<UserCreatedNotification>>(() => new LogUserCreationHandler());
+// Both handlers are discovered by RegisterServicesFromAssembly.
 
 // Publish (both handlers execute concurrently)
 await dispatcher.PublishAsync(new UserCreatedNotification(userId, email));
@@ -165,3 +161,5 @@ await dispatcher.SendAsync(new DeleteUserCommand(userId));
 ```
 
 Unit is a struct with a singleton value used to represent "void" in async contexts.
+
+Unit commands still accept closed `IPipelineBehavior<TCommand, object>` registrations for compatibility. Matching Unit-response behaviors run before the object-response group. If the same generic behavior implementation resolves for both response types, its Unit-response stage takes precedence so an open behavior does not run twice.

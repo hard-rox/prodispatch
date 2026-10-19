@@ -33,36 +33,56 @@ dotnet add <your-project>.csproj reference ../src/ProDispatch/ProDispatch.csproj
 - `IQueryPipelineBehavior` - Marker for behaviors that only apply to queries
 - `IDispatcher` - Main dispatcher interface
 
-## MediatR-Style Setup
+## Registration
+
+Register handlers by scanning their assembly. The same registration supports both request and CQRS APIs:
+
 ```csharp
-var factory = new SimpleServiceFactory();
-InProcessDispatcher? dispatcher = null;
+using Microsoft.Extensions.DependencyInjection;
+using ProDispatch.Abstractions.Dispatcher;
 
-// Register using IRequest/IRequestHandler
-factory.Register<IRequestHandler<GetUserQuery, User>>(() => new GetUserQueryHandler());
-factory.Register(typeof(IPipelineBehavior<GetUserQuery, User>), () => new LoggingBehavior<GetUserQuery, User>());
+var services = new ServiceCollection();
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
 
-dispatcher = new InProcessDispatcher(factory);
+using var provider = services.BuildServiceProvider();
+using var scope = provider.CreateScope();
+var dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
+
+// MediatR-style requests
 var user = await dispatcher.Send(new GetUserQuery(userId));
 ```
 
-## CQRS-Style Setup
+Console applications that build a provider also need the `Microsoft.Extensions.DependencyInjection` package. ASP.NET Core applications use `builder.Services.AddProDispatch(...)` and inject `IDispatcher` into endpoints or constructors; the host manages scopes and disposal.
+
+Dispatchers and discovered handlers are transient. Register application dependencies such as repositories directly on `IServiceCollection`; scoped dependencies use the scope from which the dispatcher was resolved.
+
+## CQRS Usage
 ```csharp
-var factory = new SimpleServiceFactory();
-InProcessDispatcher? dispatcher = null;
-
-factory.Register<ICommandHandler<CreateUser>>(() => new CreateUserHandler(dispatcher!));
-factory.Register<IQueryHandler<GetUserByIdQuery, User>>(() => new GetUserByIdHandler());
-factory.Register(typeof(IPipelineBehavior<CreateUser, object>), () => new ValidationBehavior<CreateUser, object>());
-
-dispatcher = new InProcessDispatcher(factory);
-
 // Commands
 await dispatcher.SendAsync(new CreateUser("alice", "alice@example.com"));
 
 // Queries
 var user = await dispatcher.SendAsync(new GetUserByIdQuery(userId));
 ```
+
+## Registering Behaviors
+
+Handlers and notifications are scanned automatically; behaviors are explicitly configured in execution order (first added is outermost):
+
+```csharp
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddBehavior<MyRequestBehavior>();
+});
+```
+
+`AddOpenBehavior` accepts an open generic `IPipelineBehavior<TRequest, TResponse>` implementation. `AddBehavior` accepts a concrete closed implementation. The logging and validation implementations are provided in the samples.
 
 ## Pipeline Behavior Scoping
 ```csharp

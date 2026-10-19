@@ -11,4 +11,3 @@ global using ProDispatch.Examples.MinimalApi.Behaviors;
 global using ProDispatch.Examples.MinimalApi.Features.Users.Commands;
 global using ProDispatch.Examples.MinimalApi.Features.Users.Notifications;
 global using ProDispatch.Examples.MinimalApi.Features.Users.Queries;
-global using ProDispatch.ServiceFactory;

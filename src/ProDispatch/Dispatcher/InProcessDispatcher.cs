@@ -1,6 +1,6 @@
 using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
 using ProDispatch.Abstractions.Requests;
-using ProDispatch.ServiceFactory;
 using UnitType = ProDispatch.Abstractions.Unit.Unit;
 
 namespace ProDispatch.Dispatcher;
@@ -10,13 +10,13 @@ namespace ProDispatch.Dispatcher;
 /// </summary>
 public class InProcessDispatcher : IDispatcher
 {
-    private readonly IServiceFactory _serviceFactory;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>Initializes a new instance of the dispatcher.</summary>
-    /// <param name="serviceFactory">Factory used to resolve handlers and behaviors.</param>
-    public InProcessDispatcher(IServiceFactory serviceFactory)
+    /// <param name="serviceProvider">Current scope's provider used to resolve handlers and behaviors.</param>
+    public InProcessDispatcher(IServiceProvider serviceProvider)
     {
-        _serviceFactory = serviceFactory ?? throw new ArgumentNullException(nameof(serviceFactory));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 
     /// <summary>Sends a request and returns a result.</summary>
@@ -29,18 +29,10 @@ public class InProcessDispatcher : IDispatcher
 
         Type requestType = request.GetType();
         Type handlerType = typeof(IRequestHandler<,>).MakeGenericType(requestType, typeof(TResponse));
-        
+
         // Try to resolve IRequestHandler first
-        object? handler = null;
-        try
-        {
-            handler = _serviceFactory.GetInstance(handlerType);
-        }
-        catch (InvalidOperationException)
-        {
-            // Fallback: Try to resolve specific command/query handler types
-            handler = TryResolveSpecificHandler(request, requestType, typeof(TResponse));
-        }
+        object? handler = _serviceProvider.GetService(handlerType)
+                          ?? TryResolveSpecificHandler(request, requestType, typeof(TResponse));
 
         if (handler == null)
         {
@@ -50,17 +42,25 @@ public class InProcessDispatcher : IDispatcher
         // Collect behaviors - for Unit commands, also include object-typed behaviors
         List<(object behavior, bool isObjectTyped)> behaviors = [];
         Type pipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(requestType, typeof(TResponse));
-        
+
         behaviors.AddRange(
-            _serviceFactory.GetInstances(pipelineType)
+            _serviceProvider.GetServices(pipelineType).OfType<object>()
                 .Where(b => ShouldApplyBehavior(b, request))
                 .Select(b => (behavior: b, isObjectTyped: false)));
-        
+
         if (typeof(TResponse) == typeof(UnitType))
         {
             Type objectPipelineType = typeof(IPipelineBehavior<,>).MakeGenericType(requestType, typeof(object));
+            // Open generic behaviors also resolve for object; do not run those stages a second time.
+            HashSet<Type> typedBehaviorDefinitions = behaviors
+                .Select(entry => entry.behavior.GetType())
+                .Where(type => type.IsConstructedGenericType)
+                .Select(type => type.GetGenericTypeDefinition())
+                .ToHashSet();
             behaviors.AddRange(
-                _serviceFactory.GetInstances(objectPipelineType)
+                _serviceProvider.GetServices(objectPipelineType).OfType<object>()
+                    .Where(b => !b.GetType().IsConstructedGenericType ||
+                                !typedBehaviorDefinitions.Contains(b.GetType().GetGenericTypeDefinition()))
                     .Where(b => ShouldApplyBehavior(b, request))
                     .Select(b => (behavior: b, isObjectTyped: true)));
         }
@@ -71,7 +71,7 @@ public class InProcessDispatcher : IDispatcher
                                       ?? throw new InvalidOperationException($"Handler {handler.GetType().Name} has no HandleAsync method");
 
             var result = handleMethod.Invoke(handler, [req, ct]);
-            
+
             // Handle both Task<TResponse> and Task (for void commands)
             if (result is Task<TResponse> taskWithResult)
             {
@@ -83,7 +83,7 @@ public class InProcessDispatcher : IDispatcher
                 // For void commands, return Unit.Value cast to TResponse
                 return (TResponse)(object)UnitType.Value;
             }
-            
+
             throw new InvalidOperationException($"Handler method returned unexpected type: {result?.GetType().Name ?? "null"}");
         };
 
@@ -111,13 +111,13 @@ public class InProcessDispatcher : IDispatcher
                     };
 
                     var behaviorResult = behaviorMethod.Invoke(currentBehavior, [req, ct, objectNext]);
-                    
+
                     if (behaviorResult is Task<object> objectTask)
                     {
                         await objectTask;
                         return (TResponse)(object)UnitType.Value;
                     }
-                    
+
                     throw new InvalidOperationException($"Behavior method returned unexpected type: {behaviorResult?.GetType().Name ?? "null"}");
                 };
             }
@@ -133,12 +133,12 @@ public class InProcessDispatcher : IDispatcher
                     }
 
                     var behaviorResult = behaviorMethod.Invoke(currentBehavior, [req, ct, previousPipeline]);
-                    
+
                     if (behaviorResult is Task<TResponse> typedTask)
                     {
                         return await typedTask;
                     }
-                    
+
                     throw new InvalidOperationException($"Behavior method returned unexpected type: {behaviorResult?.GetType().Name ?? "null"}");
                 };
             }
@@ -156,44 +156,31 @@ public class InProcessDispatcher : IDispatcher
         if (request is ICommand && typeof(TResponse) == typeof(UnitType))
         {
             Type commandHandlerType = typeof(ICommandHandler<>).MakeGenericType(requestType);
-            try
+            object? handler = _serviceProvider.GetService(commandHandlerType);
+            if (handler != null)
             {
-                return _serviceFactory.GetInstance(commandHandlerType);
-            }
-            catch (InvalidOperationException)
-            {
-                // Handler not found, try next fallback type
+                return handler;
             }
         }
-        
+
         // Check if it's a command with result
         if (request.GetType().GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(ICommand<>)))
         {
             Type commandHandlerType = typeof(ICommandHandler<,>).MakeGenericType(requestType, responseType);
-            try
+            object? handler = _serviceProvider.GetService(commandHandlerType);
+            if (handler != null)
             {
-                return _serviceFactory.GetInstance(commandHandlerType);
-            }
-            catch (InvalidOperationException)
-            {
-                // Handler not found, try next fallback type
+                return handler;
             }
         }
-        
+
         // Check if it's a query
         if (request.GetType().GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQuery<>)))
         {
             Type queryHandlerType = typeof(IQueryHandler<,>).MakeGenericType(requestType, responseType);
-            try
-            {
-                return _serviceFactory.GetInstance(queryHandlerType);
-            }
-            catch (InvalidOperationException)
-            {
-                // Handler not found, return null to throw appropriate error
-            }
+            return _serviceProvider.GetService(queryHandlerType);
         }
-        
+
         return null;
     }
 
@@ -235,7 +222,7 @@ public class InProcessDispatcher : IDispatcher
 
         Type notificationType = notification.GetType();
         Type handlerType = typeof(INotificationHandler<>).MakeGenericType(notificationType);
-        IEnumerable<object> handlers = _serviceFactory.GetInstances(handlerType);
+        IEnumerable<object> handlers = _serviceProvider.GetServices(handlerType).OfType<object>();
 
         List<Task> tasks = [];
         foreach (var handler in handlers)

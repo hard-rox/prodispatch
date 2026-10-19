@@ -1,7 +1,9 @@
 # ProDispatch
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=ProDispatch&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=ProDispatch)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=ProDispatch&metric=coverage)](https://sonarcloud.io/summary/new_code?id=ProDispatch)
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-dark.svg)](https://sonarcloud.io/summary/new_code?id=hard-rox_prodispatch)
+
+[![Quality gate status](https://sonarcloud.io/api/project_badges/measure?project=hard-rox_prodispatch&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=hard-rox_prodispatch)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=hard-rox_prodispatch&metric=coverage)](https://sonarcloud.io/summary/new_code?id=hard-rox_prodispatch)
 
 ProDispatch is a lightweight, in-process dispatcher inspired by MediatR. It supports commands, queries, notifications, and pluggable pipeline behaviors without requiring a heavy dependency injection container.
 
@@ -10,7 +12,7 @@ ProDispatch is a lightweight, in-process dispatcher inspired by MediatR. It supp
 - **CQRS Support**: Dedicated `ICommand`/`IQuery` interfaces with their respective handlers
 - **Flexible Pipeline Behaviors**: Scope behaviors to commands-only, queries-only, or all requests
 - **Notifications**: Fan-out to multiple handlers with `INotification`
-- **No External Dependencies**: Ships as a single library with no runtime dependencies
+- **Native Dependency Injection**: Uses `IServiceCollection` and `IServiceProvider` through Microsoft.Extensions.DependencyInjection.Abstractions
 - **Fully Tested**: Comprehensive test coverage with samples, integration tests, and benchmarks
 
 ## Getting Started
@@ -39,6 +41,31 @@ dotnet run -c Release --project benchmarks/ProDispatch.Benchmarks/ProDispatch.Be
 - Docs: docs (see getting-started, advanced-usage, performance, migration-from-mediatr)
 
 ## Usage
+
+### Registration
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using ProDispatch.Abstractions.Dispatcher;
+
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
+```
+
+Inject `IDispatcher` into application services or Minimal API endpoints. Request, command, query, and notification handlers are discovered automatically and registered as transient services. Application dependencies are registered normally in `IServiceCollection` and resolved from the caller's scope.
+
+Pipeline behaviors are opt-in and run first-added outermost:
+```csharp
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+```
+
+`LoggingBehavior` and `ValidationBehavior` are examples in the sample projects, not built-in library services.
 
 ### MediatR-Style API
 ```csharp

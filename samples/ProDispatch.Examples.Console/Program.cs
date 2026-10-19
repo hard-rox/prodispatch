@@ -4,60 +4,19 @@ using ProDispatch.Examples.Console.Features.Users.Commands;
 using ProDispatch.Examples.Console.Features.Users.Notifications;
 using ProDispatch.Examples.Console.Features.Users.Queries;
 
-// Setup service factory
-SimpleServiceFactory serviceFactory = new();
+ServiceCollection services = new();
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(CommandOnlyBehavior<,>));
+    cfg.AddOpenBehavior(typeof(QueryOnlyBehavior<,>));
+});
 
-// Create dispatcher first (it will be used for dependency injection)
-InProcessDispatcher? dispatcher = null;
-
-// Register handlers
-serviceFactory.Register<ICommandHandler<CreateUserCommand>>(() => new CreateUserCommandHandler(dispatcher!));
-serviceFactory.Register<ICommandHandler<UpdateUserEmailCommand, bool>>(() => new UpdateUserEmailCommandHandler());
-serviceFactory.Register<IQueryHandler<GetUserByIdQuery, UserDto>>(() => new GetUserByIdQueryHandler());
-serviceFactory.Register<INotificationHandler<UserCreatedNotification>>(() => new UserCreatedNotificationHandler());
-serviceFactory.Register<INotificationHandler<UserCreatedNotification>>(() => new SendWelcomeEmailNotificationHandler());
-
-// Register pipeline behaviors
-// Logging and validation for create command
-serviceFactory.Register(
-    typeof(IPipelineBehavior<CreateUserCommand, object>),
-    () => new LoggingBehavior<CreateUserCommand, object>());
-
-serviceFactory.Register(
-    typeof(IPipelineBehavior<CreateUserCommand, object>),
-    () => new ValidationBehavior<CreateUserCommand, object>());
-
-// Command-scoped behavior (only runs for CreateUserCommand)
-serviceFactory.Register(
-    typeof(IPipelineBehavior<CreateUserCommand, object>),
-    () => new CommandOnlyBehavior<CreateUserCommand, object>());
-
-// Behaviors for update command
-serviceFactory.Register(
-    typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
-    () => new LoggingBehavior<UpdateUserEmailCommand, bool>());
-
-serviceFactory.Register(
-    typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
-    () => new ValidationBehavior<UpdateUserEmailCommand, bool>());
-
-// Command-scoped behavior (only runs for UpdateUserEmailCommand)
-serviceFactory.Register(
-    typeof(IPipelineBehavior<UpdateUserEmailCommand, bool>),
-    () => new CommandOnlyBehavior<UpdateUserEmailCommand, bool>());
-
-// Behaviors for query
-serviceFactory.Register(
-    typeof(IPipelineBehavior<GetUserByIdQuery, UserDto>),
-    () => new LoggingBehavior<GetUserByIdQuery, UserDto>());
-
-// Query-scoped behavior (only runs for GetUserByIdQuery)
-serviceFactory.Register(
-    typeof(IPipelineBehavior<GetUserByIdQuery, UserDto>),
-    () => new QueryOnlyBehavior<GetUserByIdQuery, UserDto>());
-
-// Create dispatcher instance
-dispatcher = new(serviceFactory);
+using ServiceProvider provider = services.BuildServiceProvider();
+using IServiceScope scope = provider.CreateScope();
+IDispatcher dispatcher = scope.ServiceProvider.GetRequiredService<IDispatcher>();
 
 Console.WriteLine("=== ProDispatch Demo ===");
 

@@ -28,8 +28,8 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@v5
         with:
           args: >
-            -Dsonar.projectKey=ProDispatch
-            -Dsonar.organization=prodispatch
+            -Dsonar.projectKey=hard-rox_prodispatch
+            -Dsonar.organization=hard-rox
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.coverageReportPaths=**/coverage.cobertura.xml
         env:

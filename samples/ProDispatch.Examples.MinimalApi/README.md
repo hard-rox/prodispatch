@@ -60,11 +60,25 @@ Scalar provides a beautiful, user-friendly interface to explore and test your AP
 ## Architecture
 
 The `Program.cs` file demonstrates:
-- Setting up the dispatcher and service factory with multiple registrations
+- Registering ProDispatch through `builder.Services.AddProDispatch` with assembly-scanned handlers
 - Pipeline behavior registration (logging, validation, timing) with explicit ordering
 - Multiple notification handlers for the same event (UserCreated)
 - Exception handling for validation errors and missing resources
 - OpenAPI documentation integration
+
+```csharp
+builder.Services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(TimingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(CommandOnlyBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+    cfg.AddOpenBehavior(typeof(QueryOnlyBehavior<,>));
+});
+```
+
+Endpoint delegates receive `IDispatcher` and `CancellationToken` from ASP.NET Core. Handlers receive their dependencies through constructor injection; no dispatcher instance is captured globally.
 
 ### Pipeline Behaviors
 
@@ -72,14 +86,17 @@ Commands and queries execute through a pipeline of behaviors:
 
 **Create User Command Pipeline:**
 1. LoggingBehavior (outermost) - logs request type and duration
-2. ValidationBehavior - validates IValidatable requests
-3. TimingBehavior - measures execution time
-4. CreateUserHandler (innermost) - publishes UserCreated notification
+2. TimingBehavior - measures execution time
+3. CommandOnlyBehavior - command-scoped interception
+4. ValidationBehavior - validates IValidatable requests
+5. CreateUserHandler (innermost) - publishes UserCreated notification
 
 **Get User Query Pipeline:**
 1. LoggingBehavior - logs request type and duration
 2. TimingBehavior - measures execution time
-3. GetUserByIdHandler (innermost) - retrieves from in-memory store
+3. ValidationBehavior - continues for requests without IValidatable
+4. QueryOnlyBehavior - query-scoped interception
+5. GetUserByIdHandler (innermost) - retrieves from in-memory store
 
 ### Notifications
 
