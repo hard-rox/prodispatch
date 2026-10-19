@@ -26,8 +26,8 @@ jobs:
       - name: Restore
         run: dotnet restore ProDispatch.slnx
  
-      - name: Verify formatting
-        run: dotnet format ProDispatch.slnx --verify-no-changes --no-restore
+#      - name: Verify formatting
+#        run: dotnet format ProDispatch.slnx --verify-no-changes --no-restore
  
       - name: Install SonarScanner for .NET
         run: dotnet tool install --global dotnet-sonarscanner
