@@ -1,22 +1,26 @@
 using MediatR;
+using BenchmarkDotNet.Configs;
 using Microsoft.Extensions.DependencyInjection;
 using ProDispatch.Abstractions.Commands;
 using ProDispatch.Abstractions.Pipeline;
-using ProDispatch.Dispatcher;
-using ProDispatch.ServiceFactory;
+using ProDispatch.DependencyInjection;
+using ProDispatcher = ProDispatch.Abstractions.Dispatcher.IDispatcher;
 
 namespace ProDispatch.Benchmarks;
 
 [MemoryDiagnoser]
+[GroupBenchmarksBy(BenchmarkLogicalGroupRule.ByCategory)]
+[CategoriesColumn]
 public class DispatcherBenchmarks
 {
-    private InProcessDispatcher _commandNoPipelineDispatcher = null!;
-    private InProcessDispatcher _commandOnePipelineDispatcher = null!;
-    private InProcessDispatcher _commandMultiplePipelineDispatcher = null!;
+    private readonly List<ServiceProvider> _providers = [];
+    private ProDispatcher _commandNoPipelineDispatcher = null!;
+    private ProDispatcher _commandOnePipelineDispatcher = null!;
+    private ProDispatcher _commandMultiplePipelineDispatcher = null!;
     private BenchmarkCommand _command = null!;
-    private InProcessDispatcher _notificationDispatcher = null!;
+    private ProDispatcher _notificationDispatcher = null!;
     private BenchmarkNotification _notification = null!;
-    
+
     private IMediator _mediatrNoPipelineMediator = null!;
     private IMediator _mediatrOnePipelineMediator = null!;
     private IMediator _mediatrMultiplePipelineMediator = null!;
@@ -27,13 +31,17 @@ public class DispatcherBenchmarks
     [GlobalSetup]
     public void Setup()
     {
-        _commandNoPipelineDispatcher = BuildCommandDispatcherNoPipeline();
-        _commandOnePipelineDispatcher = BuildCommandDispatcherOnePipeline();
-        _commandMultiplePipelineDispatcher = BuildCommandDispatcherMultiplePipeline();
-        _notificationDispatcher = BuildNotificationDispatcher();
+        _commandNoPipelineDispatcher = BuildProDispatch();
+        _commandOnePipelineDispatcher = BuildProDispatch(cfg => cfg.AddBehavior<NoOpBehavior>());
+        _commandMultiplePipelineDispatcher = BuildProDispatch(cfg =>
+        {
+            cfg.AddBehavior<NoOpBehavior>();
+            cfg.AddBehavior<NoOpBehavior2>();
+        });
+        _notificationDispatcher = BuildProDispatch();
         _command = new();
         _notification = new("bench");
-        
+
         _mediatrNoPipelineMediator = BuildMediatRNoPipeline();
         _mediatrOnePipelineMediator = BuildMediatROnePipeline();
         _mediatrMultiplePipelineMediator = BuildMediatRMultiplePipeline();
@@ -42,61 +50,60 @@ public class DispatcherBenchmarks
         _mediatrNotification = new("bench");
     }
 
-    [Benchmark(Baseline = true)]
+    [Benchmark]
+    [BenchmarkCategory("SendCommandNoPipeline")]
     public Task ProDispatch_SendCommandNoPipelineAsync() => _commandNoPipelineDispatcher.SendAsync(_command);
 
     [Benchmark]
+    [BenchmarkCategory("SendCommandOnePipeline")]
     public Task ProDispatch_SendCommandOnePipelineAsync() => _commandOnePipelineDispatcher.SendAsync(_command);
 
     [Benchmark]
+    [BenchmarkCategory("SendCommandMultiplePipeline")]
     public Task ProDispatch_SendCommandMultiplePipelineAsync() => _commandMultiplePipelineDispatcher.SendAsync(_command);
 
     [Benchmark]
+    [BenchmarkCategory("PublishNotification")]
     public Task ProDispatch_PublishNotificationAsync() => _notificationDispatcher.PublishAsync(_notification);
-    
-    [Benchmark]
+
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("SendCommandNoPipeline")]
     public Task MediatR_SendCommandNoPipelineAsync() => _mediatrNoPipelineMediator.Send(_mediatrCommand);
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("SendCommandOnePipeline")]
     public Task MediatR_SendCommandOnePipelineAsync() => _mediatrOnePipelineMediator.Send(_mediatrCommand);
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("SendCommandMultiplePipeline")]
     public Task MediatR_SendCommandMultiplePipelineAsync() => _mediatrMultiplePipelineMediator.Send(_mediatrCommand);
 
-    [Benchmark]
+    [Benchmark(Baseline = true)]
+    [BenchmarkCategory("PublishNotification")]
     public Task MediatR_PublishNotificationAsync() => _mediatrNotificationMediator.Publish(_mediatrNotification);
 
-    private static InProcessDispatcher BuildCommandDispatcherNoPipeline()
+    private ProDispatcher BuildProDispatch(Action<ProDispatchServiceConfiguration>? configure = null)
     {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
-        return new(factory);
+        ServiceCollection services = new();
+        services.AddProDispatch(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(typeof(DispatcherBenchmarks).Assembly);
+            configure?.Invoke(cfg);
+        });
+        ServiceProvider provider = services.BuildServiceProvider();
+        _providers.Add(provider);
+        return provider.GetRequiredService<ProDispatcher>();
     }
 
-    private static InProcessDispatcher BuildCommandDispatcherOnePipeline()
+    [GlobalCleanup]
+    public void Cleanup()
     {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
-        factory.Register(typeof(ProDispatch.Abstractions.Pipeline.IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
-        return new(factory);
-    }
+        foreach (ServiceProvider provider in _providers)
+        {
+            provider.Dispose();
+        }
 
-    private static InProcessDispatcher BuildCommandDispatcherMultiplePipeline()
-    {
-        SimpleServiceFactory factory = new();
-        factory.Register<ICommandHandler<BenchmarkCommand>>(() => new BenchmarkCommandHandler());
-        factory.Register(typeof(ProDispatch.Abstractions.Pipeline.IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
-        factory.Register(typeof(ProDispatch.Abstractions.Pipeline.IPipelineBehavior<BenchmarkCommand, object>), () => new NoOpBehavior());
-        return new(factory);
-    }
-
-    private static InProcessDispatcher BuildNotificationDispatcher()
-    {
-        SimpleServiceFactory factory = new();
-        factory.Register<ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
-        factory.Register<ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
-        factory.Register<ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>>(() => new NoOpNotificationHandler());
-        return new(factory);
+        _providers.Clear();
     }
 
     private sealed record BenchmarkCommand : ICommand;
@@ -113,21 +120,37 @@ public class DispatcherBenchmarks
         public Task<object> HandleAsync(BenchmarkCommand request, CancellationToken cancellationToken, Func<BenchmarkCommand, CancellationToken, Task<object>> next) => next(request, cancellationToken);
     }
 
+    private sealed class NoOpBehavior2 : ProDispatch.Abstractions.Pipeline.IPipelineBehavior<BenchmarkCommand, object>
+    {
+        public Task<object> HandleAsync(BenchmarkCommand request, CancellationToken cancellationToken, Func<BenchmarkCommand, CancellationToken, Task<object>> next) => next(request, cancellationToken);
+    }
+
     private sealed class NoOpNotificationHandler : ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>
     {
         public Task HandleAsync(BenchmarkNotification notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
-    
+
+    private sealed class NoOpNotificationHandler2 : ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>
+    {
+        public Task HandleAsync(BenchmarkNotification notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class NoOpNotificationHandler3 : ProDispatch.Abstractions.Notifications.INotificationHandler<BenchmarkNotification>
+    {
+        public Task HandleAsync(BenchmarkNotification notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     // MediatR setup methods
-    private static IMediator BuildMediatRNoPipeline()
+    private IMediator BuildMediatRNoPipeline()
     {
         ServiceCollection services = new();
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<DispatcherBenchmarks>());
         ServiceProvider provider = services.BuildServiceProvider();
+        _providers.Add(provider);
         return provider.GetRequiredService<IMediator>();
     }
-    
-    private static IMediator BuildMediatROnePipeline()
+
+    private IMediator BuildMediatROnePipeline()
     {
         ServiceCollection services = new();
         services.AddMediatR(cfg =>
@@ -136,10 +159,11 @@ public class DispatcherBenchmarks
             cfg.AddBehavior<MediatR.IPipelineBehavior<MediatRBenchmarkCommand, Unit>, MediatRNoOpBehavior>();
         });
         ServiceProvider provider = services.BuildServiceProvider();
+        _providers.Add(provider);
         return provider.GetRequiredService<IMediator>();
     }
-    
-    private static IMediator BuildMediatRMultiplePipeline()
+
+    private IMediator BuildMediatRMultiplePipeline()
     {
         ServiceCollection services = new();
         services.AddMediatR(cfg =>
@@ -149,47 +173,49 @@ public class DispatcherBenchmarks
             cfg.AddBehavior<MediatR.IPipelineBehavior<MediatRBenchmarkCommand, Unit>, MediatRNoOpBehavior2>();
         });
         ServiceProvider provider = services.BuildServiceProvider();
+        _providers.Add(provider);
         return provider.GetRequiredService<IMediator>();
     }
-    
-    private static IMediator BuildMediatRNotification()
+
+    private IMediator BuildMediatRNotification()
     {
         ServiceCollection services = new();
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<DispatcherBenchmarks>());
         ServiceProvider provider = services.BuildServiceProvider();
+        _providers.Add(provider);
         return provider.GetRequiredService<IMediator>();
     }
-    
+
     // MediatR types
     private sealed record MediatRBenchmarkCommand : MediatR.IRequest<Unit>;
-    
+
     private sealed record MediatRBenchmarkNotification(string Name) : MediatR.INotification;
-    
+
     private sealed class MediatRBenchmarkCommandHandler : MediatR.IRequestHandler<MediatRBenchmarkCommand, Unit>
     {
         public Task<Unit> Handle(MediatRBenchmarkCommand request, CancellationToken cancellationToken) => Task.FromResult(Unit.Value);
     }
-    
+
     private sealed class MediatRNoOpBehavior : MediatR.IPipelineBehavior<MediatRBenchmarkCommand, Unit>
     {
         public Task<Unit> Handle(MediatRBenchmarkCommand request, RequestHandlerDelegate<Unit> next, CancellationToken cancellationToken) => next();
     }
-    
+
     private sealed class MediatRNoOpBehavior2 : MediatR.IPipelineBehavior<MediatRBenchmarkCommand, Unit>
     {
         public Task<Unit> Handle(MediatRBenchmarkCommand request, RequestHandlerDelegate<Unit> next, CancellationToken cancellationToken) => next();
     }
-    
+
     private sealed class MediatRBenchmarkNotificationHandler1 : MediatR.INotificationHandler<MediatRBenchmarkNotification>
     {
         public Task Handle(MediatRBenchmarkNotification notification, CancellationToken cancellationToken) => Task.CompletedTask;
     }
-    
+
     private sealed class MediatRBenchmarkNotificationHandler2 : MediatR.INotificationHandler<MediatRBenchmarkNotification>
     {
         public Task Handle(MediatRBenchmarkNotification notification, CancellationToken cancellationToken) => Task.CompletedTask;
     }
-    
+
     private sealed class MediatRBenchmarkNotificationHandler3 : MediatR.INotificationHandler<MediatRBenchmarkNotification>
     {
         public Task Handle(MediatRBenchmarkNotification notification, CancellationToken cancellationToken) => Task.CompletedTask;

@@ -12,4 +12,4 @@ global using ProDispatch.Examples.Console.Behaviors;
 global using ProDispatch.Examples.Console.Features.Users.Commands;
 global using ProDispatch.Examples.Console.Features.Users.Notifications;
 global using ProDispatch.Examples.Console.Features.Users.Queries;
-global using ProDispatch.ServiceFactory;
+global using Microsoft.Extensions.DependencyInjection;

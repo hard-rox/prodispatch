@@ -5,8 +5,7 @@ using ProDispatch.Abstractions.Pipeline;
 using ProDispatch.Abstractions.Queries;
 using ProDispatch.Abstractions.Exceptions;
 using ProDispatch.Abstractions.Validation;
-using ProDispatch.Dispatcher;
-using ProDispatch.ServiceFactory;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ProDispatch.IntegrationTests;
 
@@ -17,18 +16,19 @@ public class EndToEndTests
     {
         List<string> events = [];
         InMemoryUserStore store = new();
-        SimpleServiceFactory factory = new();
-        InProcessDispatcher? dispatcher = null;
-
-        factory.Register<ICommandHandler<CreateUser>>(() => new CreateUserHandler(store, () => dispatcher!));
-        factory.Register<IQueryHandler<GetUserById, UserDto>>(() => new GetUserByIdHandler(store));
-        factory.Register<INotificationHandler<UserCreated>>(() => new UserCreatedHandler(events));
-
-        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new LoggingBehavior<CreateUser, object>());
-        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new ValidationBehavior<CreateUser, object>());
-        factory.Register<IPipelineBehavior<CreateUser, object>>(() => new TrackingBehavior<CreateUser>(events, "create"));
-
-        dispatcher = new InProcessDispatcher(factory);
+        ServiceCollection services = new();
+        services.AddSingleton(store);
+        services.AddSingleton(events);
+        services.AddProDispatch(cfg =>
+        {
+            cfg.RegisterServicesFromAssembly(typeof(EndToEndTests).Assembly);
+            cfg.RegisterServicesFromAssembly(typeof(ProDispatch.Tests.DispatcherTests).Assembly);
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddBehavior<TrackingBehavior>();
+        });
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IDispatcher dispatcher = provider.GetRequiredService<IDispatcher>();
 
         CreateUser command = new("alice", "alice@example.com");
         await dispatcher.SendAsync(command, TestContext.Current.CancellationToken);
@@ -51,13 +51,13 @@ public class EndToEndTests
         }
     }
 
-    private sealed class CreateUserHandler(InMemoryUserStore store, Func<IDispatcher> dispatcherAccessor) : ICommandHandler<CreateUser>
+    private sealed class CreateUserHandler(InMemoryUserStore store, IDispatcher dispatcher) : ICommandHandler<CreateUser>
     {
         public async Task HandleAsync(CreateUser command, CancellationToken cancellationToken = default)
         {
             Guid id = Guid.NewGuid();
             store.Add(new UserDto(id, command.UserName, command.Email));
-            await dispatcherAccessor().PublishAsync(new UserCreated(id, command.UserName), cancellationToken);
+            await dispatcher.PublishAsync(new UserCreated(id, command.UserName), cancellationToken);
         }
     }
 
@@ -130,13 +130,13 @@ public class EndToEndTests
         }
     }
 
-    private sealed class TrackingBehavior<TRequest>(List<string> events, string name) : IPipelineBehavior<TRequest, object>
+    private sealed class TrackingBehavior(List<string> events) : IPipelineBehavior<CreateUser, object>
     {
-        public async Task<object> HandleAsync(TRequest request, CancellationToken cancellationToken, Func<TRequest, CancellationToken, Task<object>> next)
+        public async Task<object> HandleAsync(CreateUser request, CancellationToken cancellationToken, Func<CreateUser, CancellationToken, Task<object>> next)
         {
-            events.Add($"behavior:{name}:enter");
+            events.Add("behavior:create:enter");
             var result = await next(request, cancellationToken);
-            events.Add($"behavior:{name}:exit");
+            events.Add("behavior:create:exit");
             return result;
         }
     }

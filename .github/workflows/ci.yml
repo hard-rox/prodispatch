@@ -1,3 +1,4 @@
+
 name: CI
 
 on:
@@ -11,27 +12,46 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
+
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
+
       - name: Restore
         run: dotnet restore ProDispatch.slnx
+
       - name: Build
-        run: dotnet build ProDispatch.slnx --configuration Release --no-restore
+        run: >
+          dotnet build ProDispatch.slnx
+          --configuration Release
+          --no-restore
+
       - name: Test
-        run: dotnet test ProDispatch.slnx --configuration Release --no-build /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+        run: >
+          dotnet test ProDispatch.slnx
+          --configuration Release
+          --no-build
+          /p:CollectCoverage=true
+          /p:CoverletOutputFormat=opencover
+
+      - name: Verify coverage reports
+        run: find . -name 'coverage.opencover.xml' -print
+
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v5
+        uses: SonarSource/sonarqube-scan-action@v5
         with:
           args: >
-            -Dsonar.projectKey=ProDispatch
-            -Dsonar.organization=prodispatch
+            -Dsonar.projectKey=hard-rox_prodispatch
+            -Dsonar.organization=hard-rox
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.coverageReportPaths=**/coverage.cobertura.xml
+            -Dsonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

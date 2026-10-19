@@ -64,10 +64,7 @@ using ProDispatch.Abstractions.Notifications;  // INotification
 using ProDispatch.Abstractions.Pipeline;  // IPipelineBehavior
 ```
 
-### 3. Dispatcher Interface Choices
-ProDispatch provides two options:
-
-**Option A: Migrate to IDispatcher (Recommended)**
+### 3. Register and Inject IDispatcher
 ```csharp
 // Before (MediatR)
 private readonly IMediator _mediator;
@@ -76,38 +73,14 @@ private readonly IMediator _mediator;
 private readonly IDispatcher _dispatcher;
 ```
 
-**Option B: Use IMediator during transition (Deprecated)**
-For gradual migration, use `IMediator` temporarily. It inherits from `IDispatcher` so all methods work identically:
 ```csharp
-// Register both interfaces pointing to the same dispatcher instance
-var dispatcher = new InProcessDispatcher(factory);
-factory.Register<IDispatcher>(_ => dispatcher);
-factory.Register<IMediator>(_ => dispatcher);  // Temporary bridge
-
-// Existing code using IMediator continues to work
-public class LegacyService
+services.AddProDispatch(cfg =>
 {
-    private readonly IMediator _mediator;  // Still works
-    
-    public async Task DoWorkAsync()
-    {
-        await _mediator.Send(new MyRequest());  // Method calls unchanged
-    }
-}
-
-// New code uses IDispatcher
-public class ModernService
-{
-    private readonly IDispatcher _dispatcher;
-    
-    public async Task DoWorkAsync()
-    {
-        await _dispatcher.Send(new MyRequest());  // Same call, new interface
-    }
-}
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
 ```
 
-> ⚠️ **Note**: `IMediator` is marked `[Obsolete]` and will be removed in a future version. Migrate to `IDispatcher` at your pace.
+The legacy ProDispatch `IMediator` interface is obsolete and is not registered by `AddProDispatch`; use `IDispatcher`. The dispatcher and discovered handlers are transient and resolve application dependencies from the current DI scope.
 
 ### 4. Update Method Names
 ```csharp
@@ -189,17 +162,16 @@ public class CachingBehavior<TRequest, TResponse> :
 
 ## Pipeline Ordering
 - **MediatR**: Behaviors wrap in registration order (first registered = outermost)
-- **ProDispatch**: Behaviors wrap in **reverse** registration order (last registered = outermost)
+- **ProDispatch**: First added = outermost, with the same entry/exit ordering
 
-To maintain the same order:
+Configure behaviors explicitly rather than scanning them:
 ```csharp
-// MediatR registration order
-services.AddTransient<IPipelineBehavior<,>, LoggingBehavior<,>>();
-services.AddTransient<IPipelineBehavior<,>, ValidationBehavior<,>>();
-
-// ProDispatch equivalent (register in reverse)
-factory.Register(typeof(IPipelineBehavior<,>), () => new ValidationBehavior<,>());
-factory.Register(typeof(IPipelineBehavior<,>), () => new LoggingBehavior<,>());
+services.AddProDispatch(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
 ```
 
 ## Validation
@@ -240,23 +212,21 @@ Handlers are invoked and awaited together (fan-out). Keep them idempotent and fa
 
 ## DI Integration
 - **MediatR**: Uses `AddMediatR()` with assembly scanning
-- **ProDispatch**: Manual registration via `SimpleServiceFactory` or implement `IServiceFactory` for your DI container
+- **ProDispatch**: Uses `AddProDispatch()` on `IServiceCollection` with assembly scanning
 
 ```csharp
-// ProDispatch with SimpleServiceFactory
-var factory = new SimpleServiceFactory();
-factory.Register<IRequestHandler<GetUserQuery, User>>(() => new GetUserQueryHandler());
-var dispatcher = new InProcessDispatcher(factory);
+using Microsoft.Extensions.DependencyInjection;
 
-// ProDispatch with custom IServiceFactory (e.g., Microsoft.Extensions.DependencyInjection)
-public class DIServiceFactory : IServiceFactory
+services.AddScoped<IUserRepository, UserRepository>();
+services.AddProDispatch(cfg =>
 {
-    private readonly IServiceProvider _provider;
-    
-    public object GetInstance(Type serviceType) => _provider.GetRequiredService(serviceType);
-    public IEnumerable<object> GetInstances(Type serviceType) => _provider.GetServices(serviceType);
-}
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly);
+});
 ```
+
+Inject `IDispatcher` into handlers or application services. Console applications build and dispose their provider and scopes; ASP.NET Core manages them through the host.
+
+**Breaking registration change:** the old public service-factory types and their registration methods have been removed. Move dispatcher registration to `AddProDispatch` and application dependencies to ordinary `IServiceCollection` registrations.
 
 ## Summary
 - **Drop-in replacement** for MediatR core features
@@ -270,7 +240,7 @@ public class DIServiceFactory : IServiceFactory
 If using `IMediator` for backward compatibility, here's how to update over time:
 
 ```csharp
-// Phase 1: Coexist - both interfaces work
+// Before: a legacy consumer
 public class UserService
 {
     private readonly IMediator _mediator;  // Old way
@@ -281,7 +251,7 @@ public class UserService
     }
 }
 
-// Phase 2: Migrate - gradually switch to IDispatcher
+// After: use the interface registered by AddProDispatch
 public class OrderService
 {
     private readonly IDispatcher _dispatcher;  // New way
@@ -292,18 +262,13 @@ public class OrderService
     }
 }
 
-// Phase 3: Complete - remove all IMediator references
-// All services use IDispatcher only
 ```
 
-The method calls remain identical across all phases, allowing you to migrate at your own pace:
+The send call remains the same:
 ```csharp
 // All these work the same way
 await _mediator.Send(request);
 await _dispatcher.Send(request);
 ```
 
-**When to migrate**:
-- New code should always use `IDispatcher`
-- Existing code can continue with `IMediator` until you're ready to update
-- No breaking changes required - both interfaces coexist peacefully
+`AddProDispatch` registers `IDispatcher`, not the deprecated `IMediator` contract.

@@ -7,6 +7,13 @@ dotnet run -c Release --project benchmarks/ProDispatch.Benchmarks/ProDispatch.Be
 ```
 The default suite measures dispatcher overhead with and without pipeline behaviors using BenchmarkDotNet.
 
+Both ProDispatch and MediatR use assembly-scanned DI registration during setup. Providers are disposed during cleanup; scanning and provider construction are not timed. The notification case uses three distinct handlers, and the multiple-pipeline case uses two distinct behaviors.
+
+For a bounded smoke run of all scenarios:
+```
+dotnet run -c Release --project benchmarks/ProDispatch.Benchmarks/ProDispatch.Benchmarks.csproj -- --filter "*" --job Dry
+```
+
 ## Tips
 - Keep behaviors lightweight; heavy I/O should be asynchronous.
 - Prefer struct-like DTOs for requests/results to reduce allocations.
